@@ -189,31 +189,24 @@ if selected_tab == "📈 Visão Geral":
     else:
         st.info("Nenhuma venda no período/produto filtrado.")
 
-# ======================
-# ESTOQUE
-# ======================
-if selected_tab == "📦 Estoque Atual":
-    st.markdown("## Estoque Atual")
-    est_view = estoque.copy() if estoque is not None else pd.DataFrame()
-    if not est_view.empty:
-        if prod_filter:
-            est_view = est_view[est_view[e_prod].astype(str).isin(prod_filter)]
-        est_view_display = est_view[[e_prod, "_QTD_ESTOQUE", "_VAL_UNIT_ESTOQ", "_VAL_TOTAL_ESTOQUE"]].copy()
-        est_view_display.columns = ["PRODUTO","QUANTIDADE","PREÇO UNITÁRIO","VALOR TOTAL"]
-        for col in ["PREÇO UNITÁRIO","VALOR TOTAL"]:
-            est_view_display[col] = est_view_display[col].apply(fmt_brl)
-        st.dataframe(est_view_display.sort_values("QUANTIDADE", ascending=False), use_container_width=True)
-
-# ======================
-# VENDAS DETALHADAS
-# ======================
-if selected_tab == "🛒 Vendas Detalhadas":
-    st.markdown("## Vendas Detalhadas")
+    st.markdown("---")
+    # Top 10 produtos vendidos - gráfico torre
+    st.markdown("## 🏆 Top 10 Produtos Vendidos (Quantidade)")
     if not vendas_f.empty:
-        vendas_show = vendas_f[[v_data, v_prod, "_QTD", "_VAL_UNIT", "_VAL_TOTAL", "_LUCRO"]].copy()
-        vendas_show.columns = ["DATA","PRODUTO","QUANTIDADE","PREÇO UNITÁRIO","VALOR TOTAL","LUCRO"]
-        for col in ["PREÇO UNITÁRIO","VALOR TOTAL","LUCRO"]:
-            vendas_show[col] = vendas_show[col].apply(fmt_brl)
-        st.dataframe(vendas_show.sort_values("DATA", ascending=False), use_container_width=True)
-    else:
-        st.info("Nenhuma venda encontrada no período/produto filtrado.")
+        top_prod = vendas_f.groupby(v_prod)["_QTD"].sum().reset_index().sort_values("_QTD", ascending=False).head(10)
+        fig_top = px.bar(top_prod, x=v_prod, y="_QTD", text="_QTD", color="_QTD", color_continuous_scale=["#00FF00","#007700"])
+        fig_top.update_traces(textposition="outside")
+        fig_top.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFFFFF")
+        st.plotly_chart(fig_top, use_container_width=True)
+
+    st.markdown("---")
+    # Comparação vendas últimos 4 meses - gráfico torre
+    st.markdown("## 📊 Vendas Últimos 4 Meses")
+    if not vendas_f.empty:
+        vendas_f["_MES"] = vendas_f[v_data].dt.to_period("M").astype(str)
+        ult_4_meses = sorted(vendas_f["_MES"].unique())[-4:]
+        vendas_4 = vendas_f[vendas_f["_MES"].isin(ult_4_meses)].groupby("_MES")["_VAL_TOTAL"].sum().reset_index()
+        fig_4m = px.bar(vendas_4, x="_MES", y="_VAL_TOTAL", text="_VAL_TOTAL", color="_VAL_TOTAL", color_continuous_scale=["#00FF00","#007700"])
+        fig_4m.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+        fig_4m.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFFFFF")
+        st.plotly_chart(fig_4m, use_container_width=True)
