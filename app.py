@@ -1,5 +1,5 @@
 # =========================
-# Painel de Estoque - Kelvin Arruda
+# Painel de Estoque - Kelvin Arruda (Versão Inteligente de Leitura)
 # =========================
 
 import streamlit as st
@@ -11,10 +11,10 @@ st.set_page_config(page_title="Painel de Estoque", layout="wide")
 
 st.title("📦 Painel de Estoque")
 st.markdown("### **KELVIN ARRUDA**")
-st.write("Leitura inteligente de estoque com detecção automática de colunas.")
+st.write("Leitura automática e correção de cabeçalhos incorretos no CSV.")
 
 # -------------------------
-# Função de leitura robusta
+# Função de leitura com autoajuste
 # -------------------------
 def load_csv(file):
     encodings = ["utf-8", "latin1"]
@@ -23,20 +23,26 @@ def load_csv(file):
         for sep in seps:
             try:
                 file.seek(0)
-                df = pd.read_csv(file, sep=sep, encoding=enc, skip_blank_lines=True)
-                # remove colunas totalmente vazias
-                df = df.dropna(axis=1, how="all")
-                # remove linhas vazias
-                df = df.dropna(how="all")
+                df = pd.read_csv(file, sep=sep, encoding=enc, skip_blank_lines=True, header=None)
+                # detecta se a primeira linha contém nomes de colunas (ex: Produto, Estoque, etc)
+                primeira_linha = df.iloc[0].astype(str).str.lower()
+                if any(word in " ".join(primeira_linha) for word in ["produto", "estoque", "venda", "compra", "valor"]):
+                    df.columns = primeira_linha
+                    df = df.drop(0)
+                else:
+                    # tenta usar o header normal (segunda tentativa)
+                    file.seek(0)
+                    df = pd.read_csv(file, sep=sep, encoding=enc)
+                df = df.dropna(how="all").dropna(axis=1, how="all")
                 if len(df.columns) > 1:
                     return df
             except Exception:
                 continue
-    st.error("Não foi possível ler o arquivo. Verifique o formato CSV.")
+    st.error("❌ Não foi possível ler o arquivo. Verifique o formato CSV.")
     st.stop()
 
 # -------------------------
-# Upload de arquivo
+# Upload
 # -------------------------
 st.sidebar.header("Dados")
 file = st.sidebar.file_uploader("📁 Envie o arquivo CSV do estoque", type=["csv"])
@@ -51,12 +57,11 @@ else:
         st.info("Envie um arquivo CSV para continuar.")
         st.stop()
 
-# Normaliza nomes
+# -------------------------
+# Normaliza colunas
+# -------------------------
 df.columns = [str(c).strip().lower() for c in df.columns]
 
-# -------------------------
-# Detecta colunas automaticamente
-# -------------------------
 def detectar_coluna(possiveis):
     for p in possiveis:
         for c in df.columns:
@@ -70,14 +75,13 @@ col_vendas = detectar_coluna(["venda", "vendido"])
 col_preco = detectar_coluna(["preco", "valor"])
 col_compras = detectar_coluna(["compra"])
 
-# tenta usar a primeira coluna não numérica como produto
+# tenta usar primeira coluna não numérica como produto
 if col_prod is None:
     for c in df.columns:
         if not pd.api.types.is_numeric_dtype(df[c]):
             col_prod = c
             break
 
-# Mostra colunas detectadas
 st.sidebar.subheader("Colunas detectadas (verifique)")
 st.sidebar.json({
     "produto": col_prod,
@@ -87,9 +91,6 @@ st.sidebar.json({
     "vendas": col_vendas
 })
 
-# -------------------------
-# Limpa e padroniza dataframe
-# -------------------------
 rename_map = {
     col_prod: "Produto",
     col_estoque: "Estoque",
@@ -97,15 +98,15 @@ rename_map = {
     col_preco: "Preco",
     col_vendas: "Vendas"
 }
-
 df = df.rename(columns={k: v for k, v in rename_map.items() if k})
+
 for col in ["Estoque", "Compras", "Preco", "Vendas"]:
     if col in df.columns:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-# remove linhas sem produto
 if "Produto" not in df.columns:
     df["Produto"] = df.index.astype(str)
+
 df = df[df["Produto"].astype(str).str.strip().ne("")]
 
 # -------------------------
@@ -153,7 +154,7 @@ if "Vendas" in df.columns:
     st.pyplot(fig2)
 
 # -------------------------
-# Tabela final
+# Tabela completa
 # -------------------------
 st.divider()
 st.subheader("📋 Tabela Completa")
