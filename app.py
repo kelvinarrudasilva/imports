@@ -185,45 +185,29 @@ if not vendas.empty and "_VAL_TOTAL" in vendas.columns and v_data in vendas.colu
 else:
     unique_periods = []
 
-period_options = ["Geral"]
 period_map = {"Geral": None}
 for p in unique_periods:
-    try:
-        year, month = p.split("-")
-        pretty = datetime(int(year), int(month), 1).strftime("%b %Y")
-    except Exception:
-        pretty = p
+    year, month = p.split("-")
+    pretty = datetime(int(year), int(month), 1).strftime("%b %Y")
     label = f"{pretty} ({p})"
-    period_options.append(label)
     period_map[label] = p
 
-current_period = datetime.now().strftime("%Y-%m")
-default_label = "Geral"
-for lbl, val in period_map.items():
-    if val == current_period:
-        default_label = lbl
-        break
+default_label = datetime.now().strftime("%b %Y")
+period_options = ["Geral"] + [k for k in period_map.keys() if k != "Geral"]
 
 # ======================
 # Tabs
 # ======================
 tab1, tab2, tab3 = st.tabs(["📈 Visão Geral", "📦 Estoque Atual", "🛒 Vendas Detalhadas"])
 
-# ---- Tab 1: Visão Geral ----
+# ---- Tab 1: Visão Geral (KPIs + Top10 + Últimas Vendas) ----
 with tab1:
-    # compact month selector on the right
-    col_sel, col_space = st.columns([1, 6])
-    with col_space:
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    with col_sel:
-        periodo_sel = st.selectbox("", options=period_options, index=period_options.index(default_label) if default_label in period_options else 0, label_visibility='collapsed')
-        st.markdown(f"<div class='small' style='text-align:right;'>Periodo: <strong style='color:var(--gold);'>{periodo_sel.split(' (')[0]}</strong></div>", unsafe_allow_html=True)
-
+    periodo_sel = st.selectbox("Selecione o período", period_options, index=0)
     periodo_val = period_map.get(periodo_sel)
     if periodo_val is None:
         vendas_period = vendas.copy()
     else:
-        vendas_period = vendas[vendas.get("_PERIODO", "") == periodo_val].copy()
+        vendas_period = vendas[vendas["_PERIODO"] == periodo_val].copy()
 
     total_vendido = vendas_period["_VAL_TOTAL"].sum() if not vendas_period.empty else 0
     total_qtd = vendas_period["_QTD"].sum() if not vendas_period.empty else 0
@@ -231,100 +215,55 @@ with tab1:
     valor_estoque_venda = estoque["_VAL_TOTAL_VENDA"].sum() if not estoque.empty else 0
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"<div class='kpi'><div class='kpi-label'>💰 Vendido</div><div class='kpi-value'>{fmt_brl(total_vendido)}</div></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='kpi'><div class='kpi-label'>📈 Qtde Vendida</div><div class='kpi-value'>{int(total_qtd)}</div></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='kpi'><div class='kpi-label'>💸 Lucro do Período</div><div class='kpi-value'>{fmt_brl(lucro_period)}</div></div>", unsafe_allow_html=True)
-    c4.markdown(f"<div class='kpi'><div class='kpi-label'>📦 Valor Estoque (Venda)</div><div class='kpi-value'>{fmt_brl(valor_estoque_venda)}</div></div>", unsafe_allow_html=True)
+    c1.metric("💰 Vendido", fmt_brl(total_vendido))
+    c2.metric("📈 Qtde Vendida", f"{int(total_qtd)}")
+    c3.metric("💸 Lucro do Período", fmt_brl(lucro_period))
+    c4.metric("📦 Valor Estoque (Venda)", fmt_brl(valor_estoque_venda))
 
     st.markdown("---")
-
     # Top 10 produtos mais vendidos
-    st.subheader("🏆 Top 10 — Produtos Mais Vendidos (quantidade + valor)")
+    st.subheader("🏆 Top 10 — Produtos Mais Vendidos")
     if not vendas_period.empty and v_prod in vendas_period.columns:
-        grp = vendas_period.groupby(v_prod).agg(QTDE_SOMADA=("_QTD", "sum"), VAL_TOTAL=("_VAL_TOTAL", "sum")).reset_index()
+        grp = vendas_period.groupby(v_prod).agg(QTDE_SOMADA=("_QTD", "sum"), VAL_TOTAL=("_VAL_TOTAL","sum")).reset_index()
         grp = grp.sort_values("VAL_TOTAL", ascending=False).head(10)
-        if not grp.empty:
-            fig_top = px.bar(grp, x="VAL_TOTAL", y=v_prod, orientation="h", text="QTDE_SOMADA", color="VAL_TOTAL", color_continuous_scale=["#FFD700", "#B8860B"]) 
-            fig_top.update_traces(texttemplate='%{text:.0f} un', textposition='outside')
-            fig_top.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFD700", yaxis={'categoryorder':'total ascending'}, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_top, use_container_width=True)
+        fig_top = px.bar(grp, x="VAL_TOTAL", y=v_prod, orientation="h", text="QTDE_SOMADA",
+                         color="VAL_TOTAL", color_continuous_scale=["#FFD700","#B8860B"])
+        fig_top.update_traces(texttemplate='%{text:.0f} un', textposition='outside')
+        fig_top.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFD700",
+                              yaxis={'categoryorder':'total ascending'}, margin=dict(l=10, r=10, t=40, b=10))
+        st.plotly_chart(fig_top, use_container_width=True)
 
-            display = grp.copy()
-            display["VAL_TOTAL_FORMAT"] = display["VAL_TOTAL"].apply(fmt_brl)
-            display["QTDE_SOMADA"] = display["QTDE_SOMADA"].astype(int)
-            display = display.rename(columns={v_prod: "PRODUTO", "QTDE_SOMADA": "QUANTIDADE", "VAL_TOTAL_FORMAT": "VALOR TOTAL"})
-            st.markdown("<div class='table-card'>", unsafe_allow_html=True)
-            st.markdown("<h4>Resumo — Top 10</h4>", unsafe_allow_html=True)
-            html = "<table style='width:100%; border-collapse:collapse;'>"
-            html += "<thead><tr><th style='text-align:left;padding:6px;color:var(--muted)'>Produto</th><th style='text-align:right;padding:6px;color:var(--muted)'>Quantidade</th><th style='text-align:right;padding:6px;color:var(--muted)'>Valor Total</th></tr></thead><tbody>"
-            for _, row in display.iterrows():
-                html += f"<tr style='border-top:1px solid rgba(255,215,0,0.03)'><td style='padding:8px;color:var(--white);font-weight:600'>{row['PRODUTO']}</td><td style='padding:8px;text-align:right;color:var(--white)'>{int(row['QUANTIDADE'])}</td><td style='padding:8px;text-align:right;color:var(--gold);font-weight:700'>{row['VALOR TOTAL']}</td></tr>"
-            html += "</tbody></table>"
-            st.markdown(html, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-        else:
-            st.info("Nenhum produto encontrado para o período selecionado.")
-    else:
-        st.info("Nenhuma venda disponível para o período ou coluna de produto ausente.")
-
-    # Últimas vendas resumido
     st.markdown("---")
-    st.subheader("🕒 Últimas Vendas (resumido)")
-    if not vendas.empty and v_data in vendas.columns and v_prod in vendas.columns:
-        ult = vendas.sort_values(v_data, ascending=False).head(10)[[v_data, v_prod, "_QTD", "_VAL_TOTAL", "_LUCRO"]].copy()
-        ult[v_data] = pd.to_datetime(ult[v_data], errors="coerce").dt.strftime("%d/%m/%Y")
+    # Últimas vendas
+    st.subheader("🕒 Últimas Vendas")
+    if not vendas_period.empty:
+        ult = vendas_period.sort_values(v_data, ascending=False).head(10)
+        ult[v_data] = ult[v_data].dt.strftime("%d/%m/%Y")
         ult["_VAL_TOTAL"] = ult["_VAL_TOTAL"].apply(fmt_brl)
-        if "_LUCRO" in ult.columns:
-            ult["_LUCRO"] = ult["_LUCRO"].apply(fmt_brl)
-        ult = ult.rename(columns={v_data: "Data", v_prod: "Produto", "_QTD": "Qtd", "_VAL_TOTAL": "Valor", "_LUCRO": "Lucro"})
+        ult["_LUCRO"] = ult["_LUCRO"].apply(fmt_brl)
+        ult = ult.rename(columns={v_data:"Data", v_prod:"Produto","_QTD":"Qtd","_VAL_TOTAL":"Valor","_LUCRO":"Lucro"})
         st.dataframe(ult.reset_index(drop=True))
-    else:
-        st.info("Sem vendas registradas.")
 
 # ---- Tab 2: Estoque Atual ----
 with tab2:
-    st.markdown("## Estoque Atual — sem filtros (mostra tudo)")
+    st.subheader("📦 Estoque Atual (consulta)")
     if not estoque.empty and e_prod in estoque.columns:
         est = estoque.copy()
         est["PRODUTO"] = est[e_prod].astype(str)
-        est["QTD"] = est["_QTD"].astype(int) if "_QTD" in est.columns else 0
-        est["PRECO_VENDA_NUM"] = est["_VAL_VENDA_UNIT"] if "_VAL_VENDA_UNIT" in est.columns else 0
-        est["PRECO VENDA"] = est["PRECO_VENDA_NUM"].apply(fmt_brl)
-        est["PRECO_CUSTO_NUM"] = est["_VAL_CUSTO_UNIT"] if "_VAL_CUSTO_UNIT" in est.columns else 0
-        est["PRECO CUSTO"] = est["PRECO_CUSTO_NUM"].apply(fmt_brl)
-        est["VALOR_TOTAL_VENDA"] = est.get("_VAL_TOTAL_VENDA", 0)
-        est["VALOR_TOTAL_CUSTO"] = est.get("_VAL_TOTAL_CUSTO", 0)
-
-        total_qtd_est = est["QTD"].sum()
-        total_val_venda = est["VALOR_TOTAL_VENDA"].sum()
-        total_val_custo = est["VALOR_TOTAL_CUSTO"].sum()
-        c1, c2, c3 = st.columns([1,1,1])
-        c1.metric("📦 Qtde total em estoque", f"{int(total_qtd_est):,}".replace(",",".")) 
-        c2.metric("💰 Valor total (Venda)", fmt_brl(total_val_venda))
-        c3.metric("💸 Valor total (Custo)", fmt_brl(total_val_custo))
-        st.markdown("---")
-
-        # Top 15 quantidade estoque
-        st.subheader("Top 15 — Quantidade em Estoque (labels dentro das barras)")
-        top_est = est.sort_values("QTD", ascending=False).head(15)
-        fig_est = px.bar(top_est, x="QTD", y="PRODUTO", orientation="h", text="QTD", color="QTD", color_continuous_scale=["#FFD700","#B8860B"])
-        fig_est.update_traces(texttemplate='%{text:.0f}', textposition='outside')
-        fig_est.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFD700", yaxis={'categoryorder':'total ascending'}, margin=dict(l=10, r=10, t=40, b=10))
-        st.plotly_chart(fig_est, use_container_width=True)
+        est["QTD"] = est["_QTD"].astype(int)
+        est["PRECO VENDA"] = est["_VAL_VENDA_UNIT"].apply(fmt_brl)
+        est["PRECO CUSTO"] = est["_VAL_CUSTO_UNIT"].apply(fmt_brl)
         st.dataframe(est[["PRODUTO","QTD","PRECO VENDA","PRECO CUSTO"]].reset_index(drop=True))
     else:
         st.info("Estoque vazio ou coluna de produto não encontrada.")
 
 # ---- Tab 3: Vendas Detalhadas ----
 with tab3:
-    st.markdown("## Todas as vendas detalhadas")
+    st.subheader("🛒 Todas as vendas detalhadas")
     if not vendas.empty:
         det = vendas.copy()
-        det[v_data] = pd.to_datetime(det[v_data], errors="coerce").dt.strftime("%d/%m/%Y")
+        det[v_data] = det[v_data].dt.strftime("%d/%m/%Y")
         det["_VAL_TOTAL"] = det["_VAL_TOTAL"].apply(fmt_brl)
         det["_LUCRO"] = det["_LUCRO"].apply(fmt_brl)
-        det = det.rename(columns={v_data: "Data", v_prod: "Produto", "_QTD":"Qtd", "_VAL_TOTAL":"Valor", "_LUCRO":"Lucro"})
+        det = det.rename(columns={v_data:"Data", v_prod:"Produto","_QTD":"Qtd","_VAL_TOTAL":"Valor","_LUCRO":"Lucro"})
         st.dataframe(det.reset_index(drop=True))
-    else:
-        st.info("Sem vendas registradas.")
-
