@@ -76,9 +76,31 @@ def fmt_brl(x):
         return "R$ 0,00"
 
 # ======================
-# Carregar planilha direto do OneDrive (link de download direto)
+# Função para transformar link 1drv.ms em link de download direto
 # ======================
-ONEDRIVE_URL = "https://onedrive.live.com/download?resid=IQDHyRSnkqqEQZT1Vg9e3VJwARLyccQhj9JG3uL2lBdduGg"
+def one_drive_direct(link):
+    """
+    Converte link curto do OneDrive (1drv.ms) em link de download direto.
+    """
+    if "1drv.ms" in link:
+        try:
+            r = requests.head(link, allow_redirects=True)
+            final_url = r.url
+            # substitui 'redir?' por 'download?'
+            if "redir" in final_url:
+                direct = final_url.replace("redir?", "download?")
+            else:
+                direct = final_url
+            return direct
+        except:
+            return link
+    return link
+
+# ======================
+# Link do OneDrive (curto)
+# ======================
+ONEDRIVE_URL_SHORT = "https://1drv.ms/x/c/bc81746c0a7c734e/IQDHyRSnkqqEQZT1Vg9e3VJwARLyccQhj9JG3uL2lBdduGg"
+ONEDRIVE_URL = one_drive_direct(ONEDRIVE_URL_SHORT)
 
 try:
     resp = requests.get(ONEDRIVE_URL)
@@ -136,6 +158,5 @@ c_custo_unit = find_col(compras, "CUSTO UNITÁRIO", "CUSTO UNIT")
 c_custo_total = find_col(compras, "CUSTO TOTAL", "VALOR TOTAL")
 
 # ======================
-# [A partir daqui você mantém todo o código do seu dashboard: normalização, filtros, abas, KPIs, gráficos]
+# A partir daqui: mantenha todo o código do dashboard (normalização, filtros, KPIs, gráficos)
 # ======================
-# Apenas substitua toda referência de planilha local por `excel_bytes` ou `xls` já carregados do OneDrive
