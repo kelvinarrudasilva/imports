@@ -6,10 +6,7 @@ from pathlib import Path
 # ==============================
 # ⚙️ CONFIGURAÇÃO GERAL
 # ==============================
-st.set_page_config(
-    page_title="Painel Gerencial - Loja Importados",
-    layout="wide",
-)
+st.set_page_config(page_title="Painel Gerencial - Loja Importados", layout="wide")
 
 st.markdown(
     """
@@ -24,24 +21,38 @@ st.markdown(
 )
 
 # ==============================
+# 🔍 FUNÇÃO DE DETECÇÃO DE CABEÇALHO
+# ==============================
+def detect_header(path, sheet_name):
+    """Lê a aba detectando automaticamente onde o cabeçalho começa"""
+    temp = pd.read_excel(path, sheet_name=sheet_name, header=None)
+    for i in range(len(temp)):
+        if "PRODUTO" in str(temp.iloc[i].values).upper():
+            df = pd.read_excel(path, sheet_name=sheet_name, header=i)
+            return df
+    # fallback se não achar
+    return pd.read_excel(path, sheet_name=sheet_name)
+
+
+# ==============================
 # 📂 FUNÇÃO DE LEITURA
 # ==============================
 @st.cache_data
 def load_data(path):
     try:
         xls = pd.ExcelFile(path)
-        abas = xls.sheet_names
-        st.write("📄 Abas encontradas:", abas)
+        abas_validas = ["ESTOQUE", "VENDAS", "COMPRAS"]
+        abas_encontradas = [a for a in xls.sheet_names if a in abas_validas]
+        st.write("📄 Abas encontradas:", abas_encontradas)
 
-        estoque = vendas = compras = None
-        if "ESTOQUE" in abas:
-            estoque = pd.read_excel(xls, "ESTOQUE")
-        if "VENDAS" in abas:
-            vendas = pd.read_excel(xls, "VENDAS")
-        if "COMPRAS" in abas:
-            compras = pd.read_excel(xls, "COMPRAS")
+        dataframes = {}
+        for aba in abas_validas:
+            if aba in abas_encontradas:
+                dataframes[aba] = detect_header(path, aba)
+            else:
+                dataframes[aba] = None
 
-        return estoque, vendas, compras
+        return dataframes["ESTOQUE"], dataframes["VENDAS"], dataframes["COMPRAS"]
 
     except Exception as e:
         st.error(f"❌ Erro ao ler arquivo: {e}")
@@ -63,6 +74,8 @@ else:
     # 🔎 FUNÇÃO PARA ACHAR COLUNAS
     # ==============================
     def find_col(df, options):
+        if df is None:
+            return None
         for opt in options:
             for col in df.columns:
                 if opt.lower() in str(col).lower():
@@ -82,9 +95,9 @@ else:
     e_prod_col = find_col(estoque, ["PRODUTO"])
     e_qtd_col = find_col(estoque, ["EM ESTOQUE"])
     v_total_col = find_col(vendas, ["VALOR TOTAL"])
-    c_total_col = find_col(compras, ["CUSTO TOTAL"])
     v_valor_col = find_col(vendas, ["VALOR VENDA"])
     v_prod_col = find_col(vendas, ["PRODUTO"])
+    c_total_col = find_col(compras, ["CUSTO TOTAL"])
 
     missing_cols = []
     if not e_prod_col or not e_qtd_col:
