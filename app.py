@@ -11,7 +11,7 @@ import re
 st.set_page_config(page_title="Painel - Loja Importados", layout="wide")
 
 # ======================
-# Estilo - Tema Escuro Alto Contraste
+# Estilo - Tema Escuro e Alto Contraste
 # ======================
 st.markdown("""
 <style>
@@ -21,16 +21,16 @@ st.markdown("""
     --text:#FFFFFF; 
     --primary:#00FF00; 
     --muted:#AAAAAA;
-    --bar:#00FF00;
 }
+body { color: var(--text); background-color: var(--bg); }
 .stApp { background-color: var(--bg); color: var(--text); }
-.title { color: var(--primary); font-weight:700; font-size:26px; }
-.subtitle { color: var(--muted); font-size:14px; margin-bottom:12px; }
-.kpi { background: var(--card); padding:16px; border-radius:12px; text-align:center; }
-.kpi-value { color: var(--primary); font-size:24px; font-weight:700; }
-.kpi-label { color:var(--muted); font-size:14px; }
-.stDataFrame table { background-color:var(--card); color:var(--text); }
-.stDataFrame tbody tr th, .stDataFrame tbody tr td { color:var(--text); }
+.title { color: var(--primary); font-weight:900; font-size:36px; margin-bottom:5px;}
+.subtitle { color: var(--muted); font-size:18px; margin-bottom:15px;}
+.kpi { background: var(--card); padding:20px; border-radius:15px; text-align:center; margin-bottom:10px;}
+.kpi-value { color: var(--primary); font-size:32px; font-weight:900; }
+.kpi-label { color:var(--muted); font-size:18px; }
+.stDataFrame table { background-color:var(--card); color:var(--text); font-size:16px;}
+.stDataFrame thead th { color: var(--primary); font-weight:700; font-size:16px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,7 +121,6 @@ v_lucro = find_col(vendas, "LUCRO")
 # ======================
 # Normalizar dados
 # ======================
-# Vendas
 if vendas is not None:
     vendas[v_data] = pd.to_datetime(vendas[v_data], errors="coerce")
     vendas["_QTD"] = to_num(vendas[v_qtd])
@@ -135,7 +134,6 @@ if vendas is not None:
     else:
         vendas["_LUCRO"] = vendas["_VAL_TOTAL"]
 
-# Estoque
 if estoque is not None:
     estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd])
     estoque["_VAL_UNIT_ESTOQ"] = to_num(estoque[e_valor_unit])
@@ -145,8 +143,6 @@ if estoque is not None:
 # Sidebar - filtros
 # ======================
 st.sidebar.header("Filtros Gerais")
-
-# Filtro de data
 if vendas is not None:
     min_date = vendas[v_data].min().date()
     max_date = vendas[v_data].max().date()
@@ -154,13 +150,9 @@ if vendas is not None:
 else:
     date_range = None
 
-# Filtro de produtos
 prod_list = sorted(list(set(vendas[v_prod].dropna().astype(str).unique()) if vendas is not None else []))
 prod_filter = st.sidebar.multiselect("Produtos", options=prod_list, default=prod_list)
 
-# ======================
-# Aplicar filtros
-# ======================
 vendas_f = vendas.copy() if vendas is not None else pd.DataFrame()
 if date_range and isinstance(date_range, (list, tuple)) and len(date_range)==2:
     d_from, d_to = date_range
@@ -180,9 +172,9 @@ with tab1:
     valor_estoque = estoque["_VAL_TOTAL_ESTOQUE"].sum() if estoque is not None else 0
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("💰 Vendido", fmt_brl(total_vendido))
-    k2.metric("📈 Lucro", fmt_brl(lucro_total))
-    k3.metric("📦 Valor Estoque", fmt_brl(valor_estoque))
+    k1.markdown(f"<div class='kpi'><div class='kpi-label'>💰 Vendido</div><div class='kpi-value'>{fmt_brl(total_vendido)}</div></div>", unsafe_allow_html=True)
+    k2.markdown(f"<div class='kpi'><div class='kpi-label'>📈 Lucro</div><div class='kpi-value'>{fmt_brl(lucro_total)}</div></div>", unsafe_allow_html=True)
+    k3.markdown(f"<div class='kpi'><div class='kpi-label'>📦 Valor Estoque</div><div class='kpi-value'>{fmt_brl(valor_estoque)}</div></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("## Top 10 Produtos Mais Vendidos")
