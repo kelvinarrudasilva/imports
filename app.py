@@ -13,6 +13,7 @@ st.markdown(
         body {background-color: #0e0e0e; color: #FFD700;}
         .stMarkdown h1, h2, h3, h4 {color: #FFD700;}
         .block-container {padding-top: 1rem;}
+        .stDataFrame {background-color: #1a1a1a !important; color: #FFD700 !important;}
     </style>
     """,
     unsafe_allow_html=True
@@ -33,6 +34,32 @@ def detect_header(path, sheet_name):
     st.warning(f"⚠️ Nenhum cabeçalho com 'PRODUTO' detectado na aba **{sheet_name}**")
     return pd.read_excel(path, sheet_name=sheet_name)
 
+# ==============================
+# 🧽 LIMPEZA E FORMATAÇÃO
+# ==============================
+def limpar_e_formatar(df, aba):
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+    if aba == "ESTOQUE":
+        for col in ["Media C. UNITARIO", "Valor Venda Sugerido"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = df[col].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notna(x) else "")
+    
+    elif aba == "VENDAS":
+        df = df.drop(columns=[c for c in df.columns if "OBS" in c.upper()], errors="ignore")
+        for col in ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = df[col].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notna(x) else "")
+    
+    elif aba == "COMPRAS":
+        for col in ["CUSTO UNITÁRIO", "CUSTO TOTAL"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = df[col].apply(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if pd.notna(x) else "")
+    
+    return df
 
 # ==============================
 # 📂 LEITURA DO ARQUIVO
@@ -52,8 +79,8 @@ else:
         if aba in abas_encontradas:
             st.subheader(f"📊 Aba: {aba}")
             df = detect_header(file_path, aba)
+            df = limpar_e_formatar(df, aba)
 
-            # Mostra as primeiras linhas e info
             st.write("🧱 **Colunas detectadas:**", list(df.columns))
             st.dataframe(df.head(10))
             st.markdown("---")
