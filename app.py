@@ -94,32 +94,54 @@ vendas, err_v = load_sheet("VENDAS")
 compras, err_c = load_sheet("COMPRAS")
 
 # ======================
-# Mapear colunas
+# Mapear colunas com segurança
 # ======================
-e_prod = find_col(estoque, "PRODUTO")
-e_qtd = find_col(estoque, "EM ESTOQUE", "QTD", "QUANTIDADE")
-e_valor_unit = find_col(estoque, "Valor Venda Sugerido", "VALOR VENDA")
+def check_col(df, col_name, display_name):
+    if col_name is None or col_name not in df.columns:
+        st.warning(f"Coluna '{display_name}' não encontrada!")
+        return None
+    return col_name
 
-v_data = find_col(vendas, "DATA")
-v_prod = find_col(vendas, "PRODUTO")
-v_qtd = find_col(vendas, "QTD", "QUANTIDADE")
-v_val_unit = find_col(vendas, "VALOR VENDA", "VALOR_VENDA")
-v_val_total = find_col(vendas, "VALOR TOTAL", "VALOR_TOTAL", "TOTAL")
-v_lucro = find_col(vendas, "LUCRO")
+# ESTOQUE
+e_prod = check_col(estoque, find_col(estoque, "PRODUTO"), "PRODUTO")
+e_qtd = check_col(estoque, find_col(estoque, "EM ESTOQUE", "QTD", "QUANTIDADE"), "QUANTIDADE")
+e_valor_unit = check_col(estoque, find_col(estoque, "Valor Venda Sugerido", "VALOR VENDA"), "VALOR VENDA")
+
+# VENDAS
+v_data = check_col(vendas, find_col(vendas, "DATA"), "DATA")
+v_prod = check_col(vendas, find_col(vendas, "PRODUTO"), "PRODUTO")
+v_qtd = check_col(vendas, find_col(vendas, "QTD", "QUANTIDADE"), "QTD")
+v_val_unit = check_col(vendas, find_col(vendas, "VALOR VENDA", "VALOR_VENDA"), "VALOR VENDA")
+v_val_total = check_col(vendas, find_col(vendas, "VALOR TOTAL", "VALOR_TOTAL", "TOTAL"), "VALOR TOTAL")
+v_lucro = check_col(vendas, find_col(vendas, "LUCRO"), "LUCRO")
+
+# COMPRAS (opcional)
+c_data = check_col(compras, find_col(compras, "DATA"), "DATA")
+c_prod = check_col(compras, find_col(compras, "PRODUTO"), "PRODUTO")
+c_qtd = check_col(compras, find_col(compras, "QUANTIDADE", "QTD"), "QUANTIDADE")
+c_custo_unit = check_col(compras, find_col(compras, "CUSTO UNITÁRIO", "CUSTO UNIT"), "CUSTO UNITÁRIO")
+c_custo_total = check_col(compras, find_col(compras, "CUSTO TOTAL", "VALOR TOTAL"), "CUSTO TOTAL")
 
 # ======================
-# Preparar dados
+# Normalizar dados
 # ======================
-if vendas is not None and v_data in vendas.columns:
-    vendas[v_data] = pd.to_datetime(vendas[v_data], errors="coerce")
-    vendas["_VAL_UNIT"] = to_num(vendas[v_val_unit]) if v_val_unit in vendas.columns else 0
-    vendas["_QTD"] = to_num(vendas[v_qtd]) if v_qtd in vendas.columns else 0
-    vendas["_VAL_TOTAL"] = to_num(vendas[v_val_total]) if v_val_total in vendas.columns else vendas["_VAL_UNIT"] * vendas["_QTD"]
-    vendas["_LUCRO"] = to_num(vendas[v_lucro]) if v_lucro in vendas.columns else vendas["_VAL_UNIT"] * vendas["_QTD"]
+if vendas is not None:
+    if v_data in vendas.columns:
+        vendas[v_data] = pd.to_datetime(vendas[v_data], errors="coerce")
+    if v_val_unit in vendas.columns: vendas["_VAL_UNIT"] = to_num(vendas[v_val_unit])
+    else: vendas["_VAL_UNIT"] = 0
+    if v_qtd in vendas.columns: vendas["_QTD"] = to_num(vendas[v_qtd])
+    else: vendas["_QTD"] = 0
+    if v_val_total in vendas.columns: vendas["_VAL_TOTAL"] = to_num(vendas[v_val_total])
+    else: vendas["_VAL_TOTAL"] = vendas["_VAL_UNIT"] * vendas["_QTD"]
+    if v_lucro in vendas.columns: vendas["_LUCRO"] = to_num(vendas[v_lucro])
+    else: vendas["_LUCRO"] = vendas["_VAL_UNIT"] * vendas["_QTD"]
 
 if estoque is not None:
-    estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd]) if e_qtd in estoque.columns else 0
-    estoque["_VAL_UNIT_ESTOQ"] = to_num(estoque[e_valor_unit]) if e_valor_unit in estoque.columns else 0
+    if e_qtd in estoque.columns: estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd])
+    else: estoque["_QTD_ESTOQUE"] = 0
+    if e_valor_unit in estoque.columns: estoque["_VAL_UNIT_ESTOQ"] = to_num(estoque[e_valor_unit])
+    else: estoque["_VAL_UNIT_ESTOQ"] = 0
     estoque["_VAL_TOTAL_ESTOQUE"] = estoque["_QTD_ESTOQUE"] * estoque["_VAL_UNIT_ESTOQ"]
 
 # ======================
@@ -127,18 +149,19 @@ if estoque is not None:
 # ======================
 st.sidebar.header("Filtros")
 prod_set = set()
-if vendas is not None: prod_set.update(vendas[v_prod].dropna().astype(str).unique())
-if estoque is not None: prod_set.update(estoque[e_prod].dropna().astype(str).unique())
+if vendas is not None and v_prod in vendas.columns: prod_set.update(vendas[v_prod].dropna().astype(str).unique())
+if estoque is not None and e_prod in estoque.columns: prod_set.update(estoque[e_prod].dropna().astype(str).unique())
 prod_list = sorted([p for p in prod_set if str(p).strip() != ""])
 prod_filter = st.sidebar.multiselect("Produtos (filtrar)", options=prod_list, default=prod_list)
 st.sidebar.markdown("---")
-st.sidebar.caption("Aplicar filtros atualiza KPIs automaticamente.")
+st.sidebar.caption("Aplicar filtros atualiza KPIs e Top 10 automaticamente.")
 
 # ======================
 # Filtrar vendas
 # ======================
 vendas_f = vendas.copy() if vendas is not None else pd.DataFrame()
-if prod_filter: vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filter)]
+if v_prod in (vendas.columns if vendas is not None else []) and prod_filter:
+    vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filter)]
 
 # ======================
 # Abas
@@ -155,9 +178,27 @@ with tab1:
     k2.metric("📈 Lucro", f"{fmt_brl(lucro_total)}")
     k3.metric("📦 Estoque", f"{fmt_brl(valor_estoque)}")
 
+    # Top 10 produtos vendidos
+    if v_prod in (vendas_f.columns if vendas_f is not None else []) and v_qtd in (vendas_f.columns if vendas_f is not None else []):
+        top = vendas_f.groupby(v_prod).agg(
+            QTDE_SOMADA=(v_qtd, lambda s: to_num(s).sum()),
+            VAL_TOTAL=("_VAL_TOTAL", lambda s: to_num(s).sum())
+        ).reset_index().sort_values("VAL_TOTAL", ascending=False).head(10)
+        if not top.empty:
+            fig_top = px.bar(top, x="VAL_TOTAL", y=v_prod, orientation="h",
+                             text="QTDE_SOMADA", color="VAL_TOTAL", color_continuous_scale=["#FFD700","#B8860B"])
+            fig_top.update_traces(texttemplate='%{text:.0f} un', textposition='outside')
+            fig_top.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFD700",
+                                  yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig_top, use_container_width=True)
+            top_display = top.copy()
+            top_display["VAL_TOTAL"] = top_display["VAL_TOTAL"].apply(fmt_brl)
+            top_display["QTDE_SOMADA"] = top_display["QTDE_SOMADA"].astype(int)
+            st.table(top_display.rename(columns={v_prod:"PRODUTO","QTDE_SOMADA":"QUANTIDADE","VAL_TOTAL":"VALOR TOTAL"}))
+
 with tab2:
     st.markdown("## Estoque Atual")
-    if estoque is not None:
+    if estoque is not None and e_prod in estoque.columns:
         est_view = estoque.copy()
         est_view["PRODUTO"] = est_view[e_prod].astype(str)
         est_view["QUANTIDADE"] = est_view["_QTD_ESTOQUE"].astype(int)
