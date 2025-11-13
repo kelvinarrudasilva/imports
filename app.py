@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
 
 # ==============================
 # CONFIGURAÇÃO DA PÁGINA
@@ -13,7 +12,7 @@ st.set_page_config(
 )
 
 st.title("📊 Dashboard de Desempenho - Loja Importados")
-st.markdown("Análise de Estoque, Vendas e Compras em tempo real")
+st.markdown("Análise integrada de Estoque, Vendas e Compras")
 
 # ==============================
 # CARREGAMENTO DOS DADOS
@@ -21,24 +20,21 @@ st.markdown("Análise de Estoque, Vendas e Compras em tempo real")
 @st.cache_data
 def load_data():
     xls = pd.ExcelFile("LOJA IMPORTADOS.xlsx")
-    estoque = pd.read_excel(xls, "Tabela1")
-    vendas = pd.read_excel(xls, "Tabela2")
-    compras = pd.read_excel(xls, "Tabela3")
+    estoque = pd.read_excel(xls, "ESTOQUE")
+    vendas = pd.read_excel(xls, "VENDAS")
+    compras = pd.read_excel(xls, "COMPRAS")
     return estoque, vendas, compras
 
 estoque, vendas, compras = load_data()
 
-# Normaliza nomes das colunas
-vendas.columns = [c.strip().upper() for c in vendas.columns]
-compras.columns = [c.strip().upper() for c in compras.columns]
-estoque.columns = [c.strip().upper() for c in estoque.columns]
+# Padronizar colunas
+for df in [estoque, vendas, compras]:
+    df.columns = [c.strip().upper() for c in df.columns]
 
-# ==============================
-# TRATAMENTO DE DATAS
-# ==============================
+# Converter datas se existirem
 for df in [vendas, compras]:
     for col in df.columns:
-        if "DATA" in col.upper():
+        if "DATA" in col:
             df[col] = pd.to_datetime(df[col], errors="coerce")
 
 # ==============================
@@ -47,23 +43,23 @@ for df in [vendas, compras]:
 total_vendas = vendas["VALOR TOTAL"].sum() if "VALOR TOTAL" in vendas.columns else 0
 total_compras = compras["VALOR TOTAL"].sum() if "VALOR TOTAL" in compras.columns else 0
 lucro_estimado = total_vendas - total_compras
-itens_estoque = estoque["PRODUTO"].nunique() if "PRODUTO" in estoque.columns else 0
+qtde_estoque = estoque["QUANTIDADE"].sum() if "QUANTIDADE" in estoque.columns else 0
 
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("💰 Total de Vendas", f"R$ {total_vendas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 col2.metric("🧾 Total de Compras", f"R$ {total_compras:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 col3.metric("📈 Lucro Estimado", f"R$ {lucro_estimado:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
-col4.metric("📦 Produtos em Estoque", itens_estoque)
+col4.metric("📦 Quantidade em Estoque", int(qtde_estoque))
 
 st.markdown("---")
 
 # ==============================
-# GRÁFICOS DE VENDAS
+# VENDAS - EVOLUÇÃO MENSAL
 # ==============================
 if "DATA" in vendas.columns:
     vendas["MÊS"] = vendas["DATA"].dt.to_period("M").astype(str)
-
     vendas_mensais = vendas.groupby("MÊS")["VALOR TOTAL"].sum().reset_index()
+
     fig_vendas = px.bar(
         vendas_mensais,
         x="MÊS",
@@ -76,11 +72,11 @@ if "DATA" in vendas.columns:
     st.plotly_chart(fig_vendas, use_container_width=True)
 
 # ==============================
-# PRODUTOS MAIS VENDIDOS
+# TOP PRODUTOS MAIS VENDIDOS
 # ==============================
 if "PRODUTO" in vendas.columns:
     top_produtos = vendas.groupby("PRODUTO")["VALOR TOTAL"].sum().nlargest(10).reset_index()
-    fig_produtos = px.bar(
+    fig_top = px.bar(
         top_produtos,
         x="VALOR TOTAL",
         y="PRODUTO",
@@ -90,10 +86,10 @@ if "PRODUTO" in vendas.columns:
         color="VALOR TOTAL",
         color_continuous_scale="bluered"
     )
-    st.plotly_chart(fig_produtos, use_container_width=True)
+    st.plotly_chart(fig_top, use_container_width=True)
 
 # ==============================
-# EVOLUÇÃO DAS COMPRAS
+# COMPRAS - EVOLUÇÃO MENSAL
 # ==============================
 if "DATA" in compras.columns:
     compras["MÊS"] = compras["DATA"].dt.to_period("M").astype(str)
@@ -111,8 +107,9 @@ if "DATA" in compras.columns:
 # ESTOQUE ATUAL
 # ==============================
 if "QUANTIDADE" in estoque.columns:
+    top_estoque = estoque.sort_values("QUANTIDADE", ascending=False).head(15)
     fig_estoque = px.bar(
-        estoque.sort_values("QUANTIDADE", ascending=False).head(15),
+        top_estoque,
         x="PRODUTO",
         y="QUANTIDADE",
         title="📊 Top 15 Itens em Estoque",
@@ -131,4 +128,4 @@ with st.expander("📋 Visualizar Dados Detalhados"):
     tab3.dataframe(estoque)
 
 st.markdown("---")
-st.caption("© 2025 Loja Importados | Dashboard gerado em Python + Streamlit + Plotly")
+st.caption("© 2025 Loja Importados | Dashboard gerado com Python, Streamlit e Plotly")
