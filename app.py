@@ -8,30 +8,30 @@ import re
 # ======================
 # Config visual (Claro + Verde)
 # ======================
-st.set_page_config(page_title="Painel - Loja Importados", layout="wide")
+st.set_page_config(page_title="Painel Executivo - Loja Importados", layout="wide")
 
 st.markdown(
     """
     <style>
-      :root { --green:#2E7D32; --bg:#F0F4F8; --card:#FFFFFF; --muted:#555555; }
+      :root { --green:#28a745; --bg:#f5f5f5; --card:#ffffff; --muted:#555555; }
       .stApp { background-color: var(--bg); color: var(--green); }
       .title { color: var(--green); font-weight:700; font-size:22px; }
       .subtitle { color: var(--muted); font-size:12px; margin-bottom:12px; }
-      .kpi { background: linear-gradient(90deg, #e0f2f1, #b2dfdb); padding:12px; border-radius:10px; text-align:center; }
+      .kpi { background: var(--card); padding:12px; border-radius:10px; text-align:center; box-shadow: 1px 1px 6px rgba(0,0,0,0.1); }
       .kpi-value { color: var(--green); font-size:20px; font-weight:700; }
       .kpi-label { color:var(--muted); font-size:13px; }
-      .stDataFrame table { background-color:#ffffff; color:#2E7D32; }
+      .stDataFrame table { background-color:#ffffff; color:#000000; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown("<div class='title'>📊 Painel — Loja Importados</div>", unsafe_allow_html=True)
+st.markdown("<div class='title'>📊 Painel Executivo — Loja Importados</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>Tema: Claro & Verde • Abas: Visão Geral / Estoque</div>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ======================
-# Util helpers
+# Funções utilitárias
 # ======================
 def detect_header(path, sheet_name, look_for="PRODUTO"):
     raw = pd.read_excel(path, sheet_name=sheet_name, header=None)
@@ -86,7 +86,6 @@ xls = pd.ExcelFile(EXCEL)
 available = set([s.upper() for s in xls.sheet_names])
 needed = {"ESTOQUE", "VENDAS", "COMPRAS"}
 found = needed.intersection(available)
-
 st.sidebar.markdown("### Fonte")
 st.sidebar.write("Abas encontradas:", list(xls.sheet_names))
 st.sidebar.markdown("---")
@@ -107,12 +106,14 @@ if err_v: st.warning(err_v)
 if err_c: st.warning(err_c)
 
 # ======================
-# Mapear colunas
+# Mapear colunas essenciais
 # ======================
+# Estoque
 e_prod = find_col(estoque, "PRODUTO")
 e_qtd = find_col(estoque, "EM ESTOQUE", "QTD", "QUANTIDADE")
 e_valor_unit = find_col(estoque, "Valor Venda Sugerido", "VALOR VENDA")
 
+# Vendas
 v_data = find_col(vendas, "DATA")
 v_prod = find_col(vendas, "PRODUTO")
 v_qtd = find_col(vendas, "QTD", "QUANTIDADE")
@@ -121,70 +122,81 @@ v_val_total = find_col(vendas, "VALOR TOTAL", "VALOR_TOTAL", "TOTAL")
 v_media_custo = find_col(vendas, "MEDIA CUSTO UNITARIO", "MEDIA C. UNITARIO")
 v_lucro = find_col(vendas, "LUCRO")
 
-c_data = find_col(compras, "DATA")
-c_prod = find_col(compras, "PRODUTO")
-c_qtd = find_col(compras, "QUANTIDADE", "QTD")
-c_custo_unit = find_col(compras, "CUSTO UNITÁRIO", "CUSTO UNIT")
-c_custo_total = find_col(compras, "CUSTO TOTAL", "VALOR TOTAL")
-
-missing = []
-if estoque is None: missing.append("ESTOQUE não carregada")
-if vendas is None: missing.append("VENDAS não carregada")
-if compras is None: missing.append("COMPRAS não carregada")
-if missing:
-    st.warning(" | ".join(missing))
-
 # ======================
-# Preparar/normalizar dados
+# Normalizar dados
 # ======================
+# Vendas
 if vendas is not None:
     if v_data in vendas.columns:
         vendas[v_data] = pd.to_datetime(vendas[v_data], errors="coerce")
-    vendas["_VAL_UNIT"] = to_num(vendas[v_val_unit]) if v_val_unit in vendas.columns else 0
-    vendas["_QTD"] = to_num(vendas[v_qtd]) if v_qtd in vendas.columns else 0
-    vendas["_VAL_TOTAL"] = to_num(vendas[v_val_total]) if v_val_total in vendas.columns else vendas["_VAL_UNIT"] * vendas["_QTD"]
+    if v_val_unit in vendas.columns:
+        vendas["_VAL_UNIT"] = to_num(vendas[v_val_unit])
+    if v_qtd in vendas.columns:
+        vendas["_QTD"] = to_num(vendas[v_qtd])
+    if v_val_total in vendas.columns:
+        vendas["_VAL_TOTAL"] = to_num(vendas[v_val_total])
+    elif "_VAL_UNIT" in vendas.columns and "_QTD" in vendas.columns:
+        vendas["_VAL_TOTAL"] = vendas["_VAL_UNIT"] * vendas["_QTD"]
+    else:
+        vendas["_VAL_TOTAL"] = 0
+    # Lucro
     if v_lucro in vendas.columns:
         vendas["_LUCRO"] = to_num(vendas[v_lucro])
     else:
-        vendas["_CUSTO_UNIT"] = to_num(vendas[v_media_custo]) if v_media_custo in vendas.columns else 0
-        vendas["_LUCRO"] = (vendas["_VAL_UNIT"] - vendas["_CUSTO_UNIT"]) * vendas["_QTD"]
+        if v_media_custo in vendas.columns:
+            vendas["_CUSTO_UNIT"] = to_num(vendas[v_media_custo])
+        else:
+            vendas["_CUSTO_UNIT"] = 0
+            if e_prod and e_prod in estoque.columns:
+                e_media = find_col(estoque, "Media C. UNITARIO", "MEDIA C")
+                if e_media:
+                    mapa = estoque[[e_prod, e_media]].dropna()
+                    mapa[e_prod] = mapa[e_prod].astype(str).str.strip()
+                    mapa_dict = mapa.set_index(e_prod)[e_media].to_dict()
+                    vendas["_CUSTO_UNIT"] = vendas[v_prod].astype(str).str.strip().map(mapa_dict).fillna(0)
+        vendas["_LUCRO"] = (vendas["_VAL_UNIT"].fillna(0) - vendas["_CUSTO_UNIT"].fillna(0)) * vendas["_QTD"].fillna(0)
 
-if compras is not None:
-    if c_data in compras.columns:
-        compras[c_data] = pd.to_datetime(compras[c_data], errors="coerce")
-    compras["_QTD"] = to_num(compras[c_qtd]) if c_qtd in compras.columns else 0
-    compras["_CUSTO_UNIT"] = to_num(compras[c_custo_unit]) if c_custo_unit in compras.columns else 0
-    compras["_CUSTO_TOTAL"] = to_num(compras[c_custo_total]) if c_custo_total in compras.columns else compras["_CUSTO_UNIT"] * compras["_QTD"]
-
+# Estoque
 if estoque is not None:
-    estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd]) if e_qtd in estoque.columns else 0
-    estoque["_VAL_UNIT_ESTOQ"] = to_num(estoque[e_valor_unit]) if e_valor_unit in estoque.columns else 0
-    estoque["_VAL_TOTAL_ESTOQUE"] = estoque["_QTD_ESTOQUE"] * estoque["_VAL_UNIT_ESTOQ"]
+    if e_qtd in estoque.columns:
+        estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd])
+    if e_valor_unit in estoque.columns:
+        estoque["_VAL_UNIT_ESTOQ"] = to_num(estoque[e_valor_unit])
+    if "_QTD_ESTOQUE" in estoque.columns and "_VAL_UNIT_ESTOQ" in estoque.columns:
+        estoque["_VAL_TOTAL_ESTOQUE"] = estoque["_QTD_ESTOQUE"] * estoque["_VAL_UNIT_ESTOQ"]
+    else:
+        estoque["_VAL_TOTAL_ESTOQUE"] = 0
 
 # ======================
 # Sidebar filtros
 # ======================
 st.sidebar.header("Filtros")
 if vendas is not None and v_data in vendas.columns:
-    min_date = vendas[v_data].min().date() if pd.notna(vendas[v_data].min()) else None
-    max_date = vendas[v_data].max().date() if pd.notna(vendas[v_data].max()) else None
+    min_date = vendas[v_data].min().date()
+    max_date = vendas[v_data].max().date()
     date_range = st.sidebar.date_input("Período (Vendas)", value=(min_date, max_date))
 else:
     date_range = None
 
 prod_set = set()
-if vendas is not None and v_prod in vendas.columns: prod_set.update(vendas[v_prod].dropna().astype(str).unique())
-if estoque is not None and e_prod in estoque.columns: prod_set.update(estoque[e_prod].dropna().astype(str).unique())
+if vendas is not None and v_prod in vendas.columns:
+    prod_set.update(vendas[v_prod].dropna().astype(str).unique())
+if estoque is not None and e_prod in estoque.columns:
+    prod_set.update(estoque[e_prod].dropna().astype(str).unique())
 prod_list = sorted([p for p in prod_set if str(p).strip() != ""])
 prod_filter = st.sidebar.multiselect("Produtos (filtrar)", options=prod_list, default=prod_list)
-st.sidebar.markdown("---")
-st.sidebar.caption("Aplicar filtros atualiza KPIs e os Top 10 automaticamente.")
 
+st.sidebar.markdown("---")
+st.sidebar.caption("Filtros atualizam KPIs e tabelas automaticamente.")
+
+# Aplicar filtros
 vendas_f = vendas.copy() if vendas is not None else pd.DataFrame()
 if date_range and isinstance(date_range, (list, tuple)) and len(date_range) == 2 and v_data in vendas.columns:
     d_from, d_to = date_range
     vendas_f = vendas_f[(vendas_f[v_data].dt.date >= d_from) & (vendas_f[v_data].dt.date <= d_to)]
-if prod_filter: vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filter)]
+
+if prod_filter:
+    vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filter)]
 
 # ======================
 # Abas
@@ -192,68 +204,50 @@ if prod_filter: vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filte
 tab1, tab2 = st.tabs(["📈 Visão Geral", "📦 Estoque Atual"])
 
 with tab1:
-    st.markdown("## Visão Geral — vendas e lucro (período filtrado)")
-    total_vendido_period = vendas_f["_VAL_TOTAL"].sum() if "_VAL_TOTAL" in vendas_f.columns else 0
-    lucro_period = vendas_f["_LUCRO"].sum() if "_LUCRO" in vendas_f.columns else 0
-    valor_total_estoque = estoque["_VAL_TOTAL_ESTOQUE"].sum() if estoque is not None else 0
-    k1, k2, k3 = st.columns(3)
-    k1.markdown(f"<div class='kpi'><div class='kpi-label'>💰 Vendido no período</div><div class='kpi-value'>{fmt_brl(total_vendido_period)}</div></div>", unsafe_allow_html=True)
-    k2.markdown(f"<div class='kpi'><div class='kpi-label'>📈 Lucro no período</div><div class='kpi-value'>{fmt_brl(lucro_period)}</div></div>", unsafe_allow_html=True)
-    k3.markdown(f"<div class='kpi'><div class='kpi-label'>📦 Valor total do estoque</div><div class='kpi-value'>{fmt_brl(valor_total_estoque)}</div></div>", unsafe_allow_html=True)
+    st.markdown("## KPIs Estratégicos")
+    total_vendido = vendas_f["_VAL_TOTAL"].sum() if "_VAL_TOTAL" in vendas_f.columns else 0
+    lucro_total = vendas_f["_LUCRO"].sum() if "_LUCRO" in vendas_f.columns else 0
+    valor_estoque = estoque["_VAL_TOTAL_ESTOQUE"].sum() if estoque is not None else 0
+    margem_media = (lucro_total / total_vendido * 100) if total_vendido != 0 else 0
+    ticket_medio = (total_vendido / vendas_f["_QTD"].sum()) if "_QTD" in vendas_f.columns and vendas_f["_QTD"].sum() != 0 else 0
+
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.markdown(f"<div class='kpi'><div class='kpi-label'>💰 Total Vendido</div><div class='kpi-value'>{fmt_brl(total_vendido)}</div></div>", unsafe_allow_html=True)
+    k2.markdown(f"<div class='kpi'><div class='kpi-label'>📈 Lucro</div><div class='kpi-value'>{fmt_brl(lucro_total)}</div></div>", unsafe_allow_html=True)
+    k3.markdown(f"<div class='kpi'><div class='kpi-label'>📦 Valor Estoque</div><div class='kpi-value'>{fmt_brl(valor_estoque)}</div></div>", unsafe_allow_html=True)
+    k4.markdown(f"<div class='kpi'><div class='kpi-label'>📊 Margem Média (%)</div><div class='kpi-value'>{margem_media:.2f}%</div></div>", unsafe_allow_html=True)
+    k5.markdown(f"<div class='kpi'><div class='kpi-label'>🛒 Ticket Médio</div><div class='kpi-value'>{fmt_brl(ticket_medio)}</div></div>", unsafe_allow_html=True)
+
     st.markdown("---")
+    st.subheader("🏆 Top 10 Produtos Mais Vendidos")
+    if not vendas_f.empty:
+        top = vendas_f.groupby(v_prod).agg(
+            QTDE=(' _QTD', 'sum') if '_QTD' in vendas_f.columns else ('_VAL_TOTAL','sum'),
+            VAL_TOTAL=('_VAL_TOTAL','sum')
+        ).reset_index().sort_values('VAL_TOTAL', ascending=False).head(10)
+        st.dataframe(top)
+    else:
+        st.info("Nenhuma venda para o período/produtos filtrados.")
 
 with tab2:
-    st.markdown("## Estoque Atual — controle claro")
-    if estoque is not None:
+    st.markdown("## Estoque Atual")
+    if estoque is not None and e_prod in estoque.columns:
         est_view = estoque.copy()
-        est_view["PRODUTO"] = est_view[e_prod].astype(str) if e_prod in est_view.columns else "N/A"
-        est_view["QUANTIDADE"] = est_view["_QTD_ESTOQUE"].astype(int) if "_QTD_ESTOQUE" in est_view.columns else 0
-        for col in ["PRECO_UNITARIO_VENDA", "VALOR_TOTAL_ESTOQUE"]:
-            if col not in est_view.columns:
-                est_view[col] = 0
-        if e_valor_unit in est_view.columns: est_view["PRECO_UNITARIO_VENDA"] = est_view["_VAL_UNIT_ESTOQ"]
+        est_view["PRODUTO"] = est_view[e_prod].astype(str)
+        est_view["QUANTIDADE"] = est_view["_QTD_ESTOQUE"].astype(int)
         est_view["VALOR_TOTAL_ESTOQUE"] = est_view["_VAL_TOTAL_ESTOQUE"]
 
-        if prod_filter: est_view = est_view[est_view["PRODUTO"].astype(str).isin(prod_filter)]
+        if prod_filter:
+            est_view = est_view[est_view["PRODUTO"].isin(prod_filter)]
 
-        total_qty_est = est_view["QUANTIDADE"].sum()
-        total_val_est = est_view["VALOR_TOTAL_ESTOQUE"].sum()
+        total_qty = est_view["QUANTIDADE"].sum()
+        total_val = est_view["VALOR_TOTAL_ESTOQUE"].sum()
         c1, c2 = st.columns(2)
-        c1.metric("📦 Qtde total em estoque", f"{int(total_qty_est):,}".replace(",", "."))
-        c2.metric("💰 Valor total do estoque", fmt_brl(total_val_est))
+        c1.metric("📦 Qtde total", f"{total_qty:,}".replace(",", "."))
+        c2.metric("💰 Valor total", fmt_brl(total_val))
 
         st.markdown("---")
-        st.subheader("Tabela de Estoque (visualização)")
-        display_cols = ["PRODUTO", "QUANTIDADE", "PRECO_UNITARIO_VENDA", "VALOR_TOTAL_ESTOQUE"]
-        df_show = est_view[display_cols].copy()
-        df_show["QUANTIDADE"] = df_show["QUANTIDADE"].fillna(0).astype(int)
-        df_show["PRECO_UNITARIO_VENDA"] = df_show["PRECO_UNITARIO_VENDA"].fillna(0).apply(fmt_brl)
-        df_show["VALOR_TOTAL_ESTOQUE"] = df_show["VALOR_TOTAL_ESTOQUE"].fillna(0).apply(fmt_brl)
-        st.dataframe(df_show.sort_values("QUANTIDADE", ascending=False).reset_index(drop=True))
-
-        st.markdown("---")
-        top_value = est_view.sort_values("VALOR_TOTAL_ESTOQUE", ascending=False).head(15)
-        if not top_value.empty:
-            fig_e = px.bar(top_value, x="PRODUTO", y="VALOR_TOTAL_ESTOQUE", title="Top 15 - Valor em Estoque",
-                           color="VALOR_TOTAL_ESTOQUE", color_continuous_scale=["#2E7D32","#66BB6A"])
-            fig_e.update_layout(plot_bgcolor="#F0F4F8", paper_bgcolor="#F0F4F8", font_color="#2E7D32")
-            st.plotly_chart(fig_e, use_container_width=True)
+        st.subheader("Tabela Estoque")
+        st.dataframe(est_view[["PRODUTO","QUANTIDADE","VALOR_TOTAL_ESTOQUE"]].sort_values("QUANTIDADE", ascending=False).reset_index(drop=True))
     else:
-        st.warning("Aba ESTOQUE ou colunas necessárias não encontradas.")
-
-# ======================
-# Diagnóstico
-# ======================
-with st.expander("🔧 Diagnóstico (colunas detectadas e amostras)"):
-    st.markdown("**ESTOQUE**")
-    if estoque is not None: st.dataframe(estoque.head(6))
-    else: st.write("ESTOQUE não carregado.")
-    st.markdown("**VENDAS**")
-    if vendas is not None: st.dataframe(vendas.head(6))
-    else: st.write("VENDAS não carregado.")
-    st.markdown("**COMPRAS**")
-    if compras is not None: st.dataframe(compras.head(6))
-    else: st.write("COMPRAS não carregado.")
-
-st.markdown("---")
-st.caption("Dashboard — Tema: Claro + Verde. Desenvolvido em Streamlit.")
+        st.warning("Estoque não carregado ou colunas faltando.")
