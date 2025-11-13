@@ -5,13 +5,10 @@ import plotly.express as px
 from pathlib import Path
 import re
 
-# ======================
-# Configuração da página
-# ======================
-st.set_page_config(page_title="Painel - Loja Importados", layout="wide")
+st.set_page_config(page_title="Painel Loja Importados", layout="wide")
 
 # ======================
-# Estilo - Tema Escuro e Alto Contraste
+# Estilo Moderno Dark
 # ======================
 st.markdown("""
 <style>
@@ -21,21 +18,46 @@ st.markdown("""
     --text:#FFFFFF; 
     --primary:#00FF00; 
     --muted:#AAAAAA;
+    --btn-bg:#111111;
+    --btn-hover:#00FF00;
 }
-body { color: var(--text); background-color: var(--bg); }
-.stApp { background-color: var(--bg); color: var(--text); }
-.title { color: var(--primary); font-weight:900; font-size:36px; margin-bottom:5px;}
-.subtitle { color: var(--muted); font-size:18px; margin-bottom:15px;}
+body { background-color: var(--bg); color: var(--text);}
+.title { font-size:36px; font-weight:900; color: var(--primary); margin-bottom:5px; }
+.subtitle { font-size:18px; color: var(--muted); margin-bottom:15px; }
 .kpi { background: var(--card); padding:20px; border-radius:15px; text-align:center; margin-bottom:10px;}
 .kpi-value { color: var(--primary); font-size:32px; font-weight:900; }
 .kpi-label { color:var(--muted); font-size:18px; }
 .stDataFrame table { background-color:var(--card); color:var(--text); font-size:16px;}
 .stDataFrame thead th { color: var(--primary); font-weight:700; font-size:16px;}
+.dashboard-btn {
+    display:inline-block;
+    padding:12px 25px;
+    margin:5px 5px 15px 5px;
+    background-color: var(--btn-bg);
+    color: var(--text);
+    font-weight:700;
+    font-size:18px;
+    border-radius:12px;
+    cursor:pointer;
+    border:2px solid var(--primary);
+    transition: all 0.3s;
+}
+.dashboard-btn:hover {
+    background-color: var(--primary);
+    color: var(--bg);
+}
+.dashboard-btn-selected {
+    background-color: var(--primary);
+    color: var(--bg);
+}
 </style>
 """, unsafe_allow_html=True)
 
+# ======================
+# Cabeçalho
+# ======================
 st.markdown("<div class='title'>📊 Painel — Loja Importados</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Tema: Escuro Alto Contraste • Abas: Visão Geral / Estoque / Vendas Detalhadas</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Dashboard Escuro | Contraste Máximo | Responsivo</div>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ======================
@@ -55,8 +77,6 @@ def detect_header(path, sheet_name, look_for="PRODUTO"):
     return df
 
 def clean_df(df):
-    if df is None:
-        return None
     df.columns = [str(c).strip() for c in df.columns]
     df = df.loc[:, ~df.columns.str.contains("^Unnamed", na=False)]
     df = df.dropna(axis=1, how="all")
@@ -87,12 +107,11 @@ def fmt_brl(x):
 # ======================
 EXCEL = "LOJA IMPORTADOS.xlsx"
 if not Path(EXCEL).exists():
-    st.error(f"Arquivo '{EXCEL}' não encontrado no diretório do app.")
+    st.error(f"Arquivo '{EXCEL}' não encontrado no diretório.")
     st.stop()
 
 xls = pd.ExcelFile(EXCEL)
 available = set([s.upper() for s in xls.sheet_names])
-
 def load_sheet(name):
     if name.upper() not in available:
         return None
@@ -105,7 +124,7 @@ vendas = load_sheet("VENDAS")
 compras = load_sheet("COMPRAS")
 
 # ======================
-# Mapear colunas
+# Mapear colunas principais
 # ======================
 e_prod = find_col(estoque, "PRODUTO")
 e_qtd = find_col(estoque, "EM ESTOQUE", "QTD")
@@ -140,9 +159,9 @@ if estoque is not None:
     estoque["_VAL_TOTAL_ESTOQUE"] = estoque["_QTD_ESTOQUE"] * estoque["_VAL_UNIT_ESTOQ"]
 
 # ======================
-# Sidebar - filtros
+# Sidebar filtros
 # ======================
-st.sidebar.header("Filtros Gerais")
+st.sidebar.header("Filtros")
 if vendas is not None:
     min_date = vendas[v_data].min().date()
     max_date = vendas[v_data].max().date()
@@ -161,16 +180,24 @@ if prod_filter:
     vendas_f = vendas_f[vendas_f[v_prod].astype(str).isin(prod_filter)]
 
 # ======================
-# Abas
+# Botões estilo moderno para seções
 # ======================
-tab1, tab2, tab3 = st.tabs(["📈 Visão Geral", "📦 Estoque Atual", "🛒 Vendas Detalhadas"])
+selected_tab = st.radio(
+    "",
+    ("📈 Visão Geral", "📦 Estoque Atual", "🛒 Vendas Detalhadas"),
+    horizontal=True,
+    index=0
+)
 
-with tab1:
+# ======================
+# Seções
+# ======================
+# ---------- VISÃO GERAL ----------
+if selected_tab == "📈 Visão Geral":
     st.markdown("## KPIs")
     total_vendido = vendas_f["_VAL_TOTAL"].sum() if "_VAL_TOTAL" in vendas_f.columns else 0
     lucro_total = vendas_f["_LUCRO"].sum() if "_LUCRO" in vendas_f.columns else 0
     valor_estoque = estoque["_VAL_TOTAL_ESTOQUE"].sum() if estoque is not None else 0
-
     k1, k2, k3 = st.columns(3)
     k1.markdown(f"<div class='kpi'><div class='kpi-label'>💰 Vendido</div><div class='kpi-value'>{fmt_brl(total_vendido)}</div></div>", unsafe_allow_html=True)
     k2.markdown(f"<div class='kpi'><div class='kpi-label'>📈 Lucro</div><div class='kpi-value'>{fmt_brl(lucro_total)}</div></div>", unsafe_allow_html=True)
@@ -179,17 +206,17 @@ with tab1:
     st.markdown("---")
     st.markdown("## Top 10 Produtos Mais Vendidos")
     if not vendas_f.empty:
-        top = vendas_f.groupby(v_prod).agg(
-            QTDE=pd.NamedAgg(column="_QTD", aggfunc="sum"),
-            VAL_TOTAL=pd.NamedAgg(column="_VAL_TOTAL", aggfunc="sum")
-        ).reset_index().sort_values("VAL_TOTAL", ascending=False).head(10)
+        top = vendas_f.groupby(v_prod).agg(QTDE=pd.NamedAgg(column="_QTD", aggfunc="sum"),
+                                           VAL_TOTAL=pd.NamedAgg(column="_VAL_TOTAL", aggfunc="sum")).reset_index()
+        top = top.sort_values("VAL_TOTAL", ascending=False).head(10)
         fig_top = px.bar(top, x="VAL_TOTAL", y=v_prod, orientation="h", text="QTDE",
                          color="VAL_TOTAL", color_continuous_scale=["#00FF00","#00AA00"])
         fig_top.update_traces(texttemplate='%{text:.0f} un', textposition='outside')
         fig_top.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFFFFF", yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_top, use_container_width=True)
 
-with tab2:
+# ---------- ESTOQUE ----------
+if selected_tab == "📦 Estoque Atual":
     st.markdown("## Estoque Atual")
     est_view = estoque.copy() if estoque is not None else pd.DataFrame()
     if not est_view.empty:
@@ -210,7 +237,8 @@ with tab2:
         fig_e.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFFFFF")
         st.plotly_chart(fig_e, use_container_width=True)
 
-with tab3:
+# ---------- VENDAS DETALHADAS ----------
+if selected_tab == "🛒 Vendas Detalhadas":
     st.markdown("## Vendas Detalhadas")
     if not vendas_f.empty:
         vendas_show = vendas_f[[v_data, v_prod, "_QTD", "_VAL_UNIT", "_VAL_TOTAL", "_LUCRO"]].copy()
