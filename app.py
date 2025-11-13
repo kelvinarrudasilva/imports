@@ -37,19 +37,30 @@ st.sidebar.header("Dados")
 file = st.sidebar.file_uploader("📁 Envie seu arquivo CSV do estoque", type=["csv"])
 
 if file is not None:
-    # Tenta ler o CSV com segurança
+    # -------------------------
+    # TENTA LER O CSV COM DIFERENTES ENCODINGS E SEPARADORES
+    # -------------------------
     try:
-        df = pd.read_csv(file, sep=";", skip_blank_lines=True)
+        df = pd.read_csv(file, sep=";", skip_blank_lines=True, encoding="latin1")
         if df.empty or len(df.columns) <= 1:
             file.seek(0)
-            df = pd.read_csv(file, sep=",", skip_blank_lines=True)
-    except Exception as e:
-        st.error(f"Erro ao ler o arquivo: {e}")
-        st.stop()
-    
+            df = pd.read_csv(file, sep=",", skip_blank_lines=True, encoding="latin1")
+    except Exception:
+        try:
+            file.seek(0)
+            df = pd.read_csv(file, sep=";", skip_blank_lines=True, encoding="utf-8")
+            if df.empty or len(df.columns) <= 1:
+                file.seek(0)
+                df = pd.read_csv(file, sep=",", skip_blank_lines=True, encoding="utf-8")
+        except Exception as e:
+            st.error(f"❌ Erro ao ler o arquivo CSV: {e}")
+            st.stop()
+
     df = normalize_columns(df)
-    
-    # Renomeia colunas conhecidas automaticamente
+
+    # -------------------------
+    # AJUSTA NOMES DAS COLUNAS
+    # -------------------------
     rename_map = {
         "produto": "Produto",
         "em estoque": "Estoque",
@@ -60,12 +71,12 @@ if file is not None:
         "vendas": "Vendas"
     }
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
-    
+
     # Corrige colunas numéricas
     for col in ["Estoque", "Compras", "Custo_Unitario", "Preco_Venda", "Vendas"]:
         if col in df.columns:
             df[col] = to_number_series(df[col])
-    
+
     # Remove linhas sem produto
     if "Produto" in df.columns:
         df = df[df["Produto"].notna() & (df["Produto"] != "")]
@@ -78,11 +89,11 @@ if file is not None:
     # -------------------------
     st.divider()
     st.subheader("📊 Visão Geral")
-    
+
     total_produtos = len(df)
     total_estoque = int(df["Estoque"].sum()) if "Estoque" in df.columns else 0
     total_vendas = int(df["Vendas"].sum()) if "Vendas" in df.columns else 0
-    
+
     col1, col2, col3 = st.columns(3)
     col1.metric("Produtos Cadastrados", f"{total_produtos}")
     col2.metric("Itens em Estoque", f"{total_estoque:,}".replace(",", "."))
@@ -95,7 +106,7 @@ if file is not None:
     st.subheader("🧠 Resumo Automático")
     low_stock = df[df["Estoque"] <= 5]
     no_sales = df[df["Vendas"] == 0] if "Vendas" in df.columns else pd.DataFrame()
-    
+
     resumo = f"""
     - 🔻 {len(low_stock)} produtos estão com estoque abaixo de 5 unidades.  
     - 💤 {len(no_sales)} produtos sem nenhuma venda registrada.  
@@ -146,6 +157,6 @@ if file is not None:
     st.divider()
     st.subheader("📋 Relatório Completo")
     st.dataframe(df, use_container_width=True)
-    
+
 else:
     st.info("⬅️ Envie um arquivo CSV para começar.")
