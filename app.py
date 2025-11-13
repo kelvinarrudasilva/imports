@@ -79,7 +79,9 @@ def fmt_brl(x):
 # ======================
 # Carregar planilha direto do OneDrive
 # ======================
-ONEDRIVE_URL = "https://1drv.ms/x/c/bc81746c0a7c734e/IQDHyRSnkqqEQZT1Vg9e3VJwARLyccQhj9JG3uL2lBdduGg"
+ONEDRIVE_URL = "https://onedrive.live.com/download?resid=IQDHyRSnkqqEQZT1Vg9e3VJwARLyccQhj9JG3uL2lBdduGg"
+resp = requests.get(ONEDRIVE_URL)
+xls = pd.ExcelFile(io.BytesIO(resp.content))
 
 try:
     resp = requests.get(ONEDRIVE_URL)
@@ -141,3 +143,4 @@ c_custo_total = find_col(compras, "CUSTO TOTAL", "VALOR TOTAL")
 # [Aqui vai todo o resto do seu código que já tinha: normalização, filtros, abas, KPIs, gráficos]
 # ======================
 # Você só precisa substituir as chamadas de leitura local para usar xls vindo do OneDrive
+
