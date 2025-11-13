@@ -31,10 +31,6 @@ st.markdown("---")
 # ======================
 # Funções utilitárias
 # ======================
-def detect_header(df, look_for="PRODUTO"):
-    """Detecta linha do header se necessário (não usado nesse fluxo, mas mantido)"""
-    return df  # já vai vir limpo do Excel
-
 def clean_df(df):
     if df is None:
         return None
@@ -66,7 +62,8 @@ def fmt_brl(x):
 # ======================
 # Download do Excel do OneDrive
 # ======================
-ONEDRIVE_LINK = "https://1drv.ms/x/s!YOUR_LINK_AQUI?download=1"  # substitua pelo link de compartilhamento + ?download=1
+ONEDRIVE_LINK = "https://1drv.ms/x/c/bc81746c0a7c734e/IQDHyRSnkqqEQZT1Vg9e3VJwARLyccQhj9JG3uL2lBdduGg?download=1"
+
 try:
     r = requests.get(ONEDRIVE_LINK)
     r.raise_for_status()
@@ -81,8 +78,6 @@ except Exception as e:
 EXCEL = excel_bytes
 xls = pd.ExcelFile(EXCEL)
 available = set([s.upper() for s in xls.sheet_names])
-needed = {"ESTOQUE", "VENDAS", "COMPRAS"}
-found = needed.intersection(available)
 st.sidebar.markdown("### Fonte")
 st.sidebar.write("Abas encontradas:", list(xls.sheet_names))
 st.sidebar.markdown("---")
@@ -98,10 +93,6 @@ estoque, err_e = load_sheet("ESTOQUE")
 vendas, err_v = load_sheet("VENDAS")
 compras, err_c = load_sheet("COMPRAS")
 
-if err_e: st.warning(err_e)
-if err_v: st.warning(err_v)
-if err_c: st.warning(err_c)
-
 # ======================
 # Mapear colunas
 # ======================
@@ -114,14 +105,7 @@ v_prod = find_col(vendas, "PRODUTO")
 v_qtd = find_col(vendas, "QTD", "QUANTIDADE")
 v_val_unit = find_col(vendas, "VALOR VENDA", "VALOR_VENDA")
 v_val_total = find_col(vendas, "VALOR TOTAL", "VALOR_TOTAL", "TOTAL")
-v_media_custo = find_col(vendas, "MEDIA CUSTO UNITARIO", "MEDIA C. UNITARIO")
 v_lucro = find_col(vendas, "LUCRO")
-
-c_data = find_col(compras, "DATA")
-c_prod = find_col(compras, "PRODUTO")
-c_qtd = find_col(compras, "QUANTIDADE", "QTD")
-c_custo_unit = find_col(compras, "CUSTO UNITÁRIO", "CUSTO UNIT")
-c_custo_total = find_col(compras, "CUSTO TOTAL", "VALOR TOTAL")
 
 # ======================
 # Preparar dados
@@ -131,10 +115,7 @@ if vendas is not None and v_data in vendas.columns:
     vendas["_VAL_UNIT"] = to_num(vendas[v_val_unit]) if v_val_unit in vendas.columns else 0
     vendas["_QTD"] = to_num(vendas[v_qtd]) if v_qtd in vendas.columns else 0
     vendas["_VAL_TOTAL"] = to_num(vendas[v_val_total]) if v_val_total in vendas.columns else vendas["_VAL_UNIT"] * vendas["_QTD"]
-    if v_lucro in vendas.columns:
-        vendas["_LUCRO"] = to_num(vendas[v_lucro])
-    else:
-        vendas["_LUCRO"] = vendas["_VAL_UNIT"] * vendas["_QTD"]  # simplificado
+    vendas["_LUCRO"] = to_num(vendas[v_lucro]) if v_lucro in vendas.columns else vendas["_VAL_UNIT"] * vendas["_QTD"]
 
 if estoque is not None:
     estoque["_QTD_ESTOQUE"] = to_num(estoque[e_qtd]) if e_qtd in estoque.columns else 0
@@ -151,7 +132,7 @@ if estoque is not None: prod_set.update(estoque[e_prod].dropna().astype(str).uni
 prod_list = sorted([p for p in prod_set if str(p).strip() != ""])
 prod_filter = st.sidebar.multiselect("Produtos (filtrar)", options=prod_list, default=prod_list)
 st.sidebar.markdown("---")
-st.sidebar.caption("Aplicar filtros atualiza KPIs e os Top 10 automaticamente.")
+st.sidebar.caption("Aplicar filtros atualiza KPIs automaticamente.")
 
 # ======================
 # Filtrar vendas
