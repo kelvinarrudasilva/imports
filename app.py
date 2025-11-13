@@ -21,21 +21,19 @@ st.markdown(
 )
 
 # ==============================
-# 🔍 FUNÇÃO DE DETECÇÃO DE CABEÇALHO
+# 🔍 DETECTA CABEÇALHO AUTOMATICAMENTE
 # ==============================
 def detect_header(path, sheet_name):
-    """Lê a aba detectando automaticamente onde o cabeçalho começa"""
     temp = pd.read_excel(path, sheet_name=sheet_name, header=None)
     for i in range(len(temp)):
         if "PRODUTO" in str(temp.iloc[i].values).upper():
             df = pd.read_excel(path, sheet_name=sheet_name, header=i)
             return df
-    # fallback se não achar
     return pd.read_excel(path, sheet_name=sheet_name)
 
 
 # ==============================
-# 📂 FUNÇÃO DE LEITURA
+# 📂 LEITURA DAS ABAS
 # ==============================
 @st.cache_data
 def load_data(path):
@@ -60,7 +58,7 @@ def load_data(path):
 
 
 # ==============================
-# 🧭 SELEÇÃO DO ARQUIVO
+# 🧭 CARREGA O ARQUIVO
 # ==============================
 st.title("📊 Painel Gerencial - Loja Importados")
 
@@ -71,7 +69,7 @@ else:
     estoque, vendas, compras = load_data(file_path)
 
     # ==============================
-    # 🔎 FUNÇÃO PARA ACHAR COLUNAS
+    # 🔎 LOCALIZA NOMES DAS COLUNAS
     # ==============================
     def find_col(df, options):
         if df is None:
@@ -82,21 +80,18 @@ else:
                     return col
         return None
 
-    # ==============================
-    # ✅ VERIFICAÇÕES DE SEGURANÇA
-    # ==============================
     if estoque is None or vendas is None or compras is None:
         st.error("❌ Não foi possível carregar todas as abas. Verifique se ESTOQUE, VENDAS e COMPRAS existem.")
         st.stop()
 
-    # ==============================
-    # 🧾 IDENTIFICAR COLUNAS
-    # ==============================
     e_prod_col = find_col(estoque, ["PRODUTO"])
     e_qtd_col = find_col(estoque, ["EM ESTOQUE"])
+
     v_total_col = find_col(vendas, ["VALOR TOTAL"])
     v_valor_col = find_col(vendas, ["VALOR VENDA"])
     v_prod_col = find_col(vendas, ["PRODUTO"])
+    v_lucro_col = find_col(vendas, ["LUCRO"])
+
     c_total_col = find_col(compras, ["CUSTO TOTAL"])
 
     missing_cols = []
@@ -111,15 +106,21 @@ else:
         st.warning("⚠️ Colunas ausentes: " + ", ".join(missing_cols))
     else:
         # ==============================
-        # 💰 CÁLCULOS
+        # 💰 CÁLCULOS AJUSTADOS
         # ==============================
         total_vendas = vendas[v_total_col].sum() if v_total_col else 0
         total_compras = compras[c_total_col].sum() if c_total_col else 0
-        lucro_estimado = total_vendas - total_compras
+
+        # 🟡 Usa o lucro calculado da planilha se existir
+        if v_lucro_col:
+            lucro_estimado = vendas[v_lucro_col].sum()
+        else:
+            lucro_estimado = total_vendas - total_compras
+
         total_estoque = estoque[e_qtd_col].sum() if e_qtd_col else 0
 
         # ==============================
-        # 🧮 MÉTRICAS
+        # 🧮 MÉTRICAS PRINCIPAIS
         # ==============================
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("💰 Total de Vendas", f"R$ {total_vendas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -128,7 +129,7 @@ else:
         c4.metric("📦 Qtde em Estoque", f"{total_estoque:,}".replace(",", "."))
 
         # ==============================
-        # 📊 GRÁFICO DE VENDAS
+        # 📊 GRÁFICO DE VENDAS POR PRODUTO
         # ==============================
         if v_prod_col and v_valor_col:
             graf_vendas = vendas.groupby(v_prod_col)[v_valor_col].sum().reset_index()
