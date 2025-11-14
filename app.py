@@ -224,39 +224,33 @@ def preparar_tabela_vendas(df):
 with tabs[0]:
     st.subheader("Vendas (período selecionado)")
 
-    if vendas_filtradas.empty:
-        st.info("Sem dados de vendas para o período selecionado.")
-    else:
-        # ----------------------------
-        # GRÁFICO COMPARATIVO 6 MESES
-        # ----------------------------
-        vendas_mes = vendas_filtradas.groupby("MES_ANO").agg(
+    # --- GRÁFICO ÚLTIMOS 6 MESES ---
+    if not vendas_filtradas.empty:
+        df_6meses = vendas_filtradas.groupby("MES_ANO").agg(
             TOTAL_VENDIDO=("VALOR TOTAL", lambda x: x.fillna(0).sum()),
             TOTAL_LUCRO=("LUCRO UNITARIO", lambda x: (x.fillna(0) * vendas_filtradas.loc[x.index, "QTD"].fillna(0)).sum())
         ).reset_index().sort_values("MES_ANO", ascending=False).head(6)
 
-        vendas_mes = vendas_mes.sort_values("MES_ANO")  # ordenar do mais antigo para o mais recente
+        df_6meses = df_6meses.sort_values("MES_ANO")  # ordenar do mais antigo para o mais recente
 
-        st.subheader("📈 Comparativo Últimos 6 Meses — Total Vendido x Total Lucro")
-        fig_comparativo = px.bar(
-            vendas_mes,
+        st.subheader("📊 Comparativo Últimos 6 Meses — Vendas x Lucro")
+        fig_6meses = px.bar(
+            df_6meses,
             x="MES_ANO",
             y=["TOTAL_VENDIDO", "TOTAL_LUCRO"],
             barmode="group",
             text_auto=".2s",
             labels={"value": "R$", "MES_ANO": "Mês"},
-            color_discrete_map={
-                "TOTAL_VENDIDO": "#1aa3ff",
-                "TOTAL_LUCRO": "#0e8c4a"
-            }
+            color_discrete_map={"TOTAL_VENDIDO": "#1aa3ff", "TOTAL_LUCRO": "#0e8c4a"}
         )
-        fig_comparativo.update_traces(textposition="outside")
-        fig_comparativo.update_layout(yaxis_tickprefix="R$ ")
-        st.plotly_chart(fig_comparativo, use_container_width=True)
+        fig_6meses.update_traces(textposition="outside")
+        fig_6meses.update_layout(yaxis_tickprefix="R$ ")
+        st.plotly_chart(fig_6meses, use_container_width=True)
 
-        # ----------------------------
-        # TABELA DE VENDAS
-        # ----------------------------
+    # --- TABELA DE VENDAS ---
+    if vendas_filtradas.empty:
+        st.info("Sem dados de vendas para o período selecionado.")
+    else:
         st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
 
 # ----------------------------
@@ -266,9 +260,9 @@ with tabs[1]:
     if not vendas_filtradas.empty:
         dfv = vendas_filtradas.copy()
         if "VALOR TOTAL" not in dfv.columns:
-            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0)*dfv["QTD"].fillna(0)
+            dfv["VALOR_TOTAL"] = dfv["VALOR VENDA"].fillna(0)*dfv["QTD"].fillna(0)
         top_val = dfv.groupby("PRODUTO").agg(
-            VALOR_TOTAL=("VALOR TOTAL","sum"),
+            VALOR_TOTAL=("VALOR_TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
         fig = px.bar(
