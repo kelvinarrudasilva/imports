@@ -17,9 +17,12 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # ----------------------------
 st.markdown("""
     <style>
-      :root { --gold:#FFD700; }
-      body, .stApp { background-color:#0b0b0b; color:#EEE; }
-      h1,h2,h3,h4 { color: var(--gold); }
+      :root { --accent:#1aa3ff; --accent-dark:#0066cc; }
+      body, .stApp { background-color:#ffffff; color:#111; }
+      h1,h2,h3,h4 { color: var(--accent-dark); }
+      .stMetric label { color:#333; }
+      .stMetric div { color: var(--accent); font-weight:700; }
+      .stDataFrame thead th { background-color:#f0f8ff;}
     </style>
 """, unsafe_allow_html=True)
 st.title("📊 Loja Importados — Dashboard")
