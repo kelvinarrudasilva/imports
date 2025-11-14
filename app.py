@@ -1,38 +1,37 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Diagnóstico da Planilha", layout="wide")
-st.title("🛠️ Diagnóstico Automático da Planilha do Drive")
+st.set_page_config(page_title="Diagnóstico Automático", layout="wide")
+st.title("🛠️ Diagnóstico + Correção Automática da Planilha")
 
 URL_PLANILHA = "https://drive.google.com/uc?export=download&id=1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b"
 
-# =====================================================
-# FUNÇÃO ROBUSTA PARA CARREGAR
-# =====================================================
-def carregar_arquivo(url):
+# ============================================================
+# FUNÇÃO BASE PARA CARREGAR ARQUIVO
+# ============================================================
+def carregar_xls(url):
     try:
         xls = pd.ExcelFile(url)
         return xls, None
     except Exception as e:
         return None, str(e)
 
-xls, erro = carregar_arquivo(URL_PLANILHA)
+
+xls, erro = carregar_xls(URL_PLANILHA)
 
 if erro:
-    st.error("❌ ERRO AO CARREGAR A PLANILHA INTEIRA")
+    st.error("❌ ERRO AO LER O ARQUIVO")
     st.code(erro)
     st.stop()
 
-st.success("✅ Arquivo aberto com sucesso!")
-
-# Remover aba EXCELENTEJOAO
+# ignora aba EXCELENTEJOAO
 abas = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
-st.write("📄 **Abas detectadas:**", abas)
+st.write("📄 Abas detectadas:", abas)
 
-# =====================================================
-# DEFINIÇÃO DAS ABAS E COLUNAS ESPERADAS
-# =====================================================
-regras = {
+# ============================================================
+# COLUNAS ESPERADAS
+# ============================================================
+colunas_esperadas = {
     "ESTOQUE": [
         "PRODUTO", "EM ESTOQUE", "COMPRAS",
         "Media C. UNITARIO", "Valor Venda Sugerido", "VENDAS"
@@ -48,83 +47,117 @@ regras = {
     ]
 }
 
-# =====================================================
-# FUNÇÃO DE DIAGNÓSTICO
-# =====================================================
-def diagnosticar_aba(nome_aba, colunas_esperadas):
-    st.header(f"📌 Diagnóstico da aba: **{nome_aba}**")
+# ============================================================
+# DETECTOR DE CABEÇALHO
+# ============================================================
+def limpar_aba(df, nome_aba):
+    st.subheader(f"🔧 Limpando aba **{nome_aba}**")
 
-    # Tentar carregar
-    try:
-        df = pd.read_excel(URL_PLANILHA, sheet_name=nome_aba)
-        st.success(f"✔ Aba **{nome_aba}** carregada!")
-    except Exception as e:
-        st.error(f"❌ Não foi possível abrir a aba {nome_aba}:")
-        st.code(str(e))
+    busca = "PRODUTO" if nome_aba != "VENDAS" and nome_aba != "COMPRAS" else "DATA"
+
+    linha_cab = None
+    for i in range(len(df)):
+        linha = df.iloc[i].astype(str).str.upper().tolist()
+        if busca in " ".join(linha):
+            linha_cab = i
+            break
+
+    if linha_cab is None:
+        st.error(f"⚠ Não encontrei o cabeçalho da aba {nome_aba}.")
         return None
 
-    # Listar colunas encontradas
-    colunas_encontradas = df.columns.tolist()
-    st.write("📋 **Colunas encontradas:**", colunas_encontradas)
+    # define cabeçalho real
+    df.columns = df.iloc[linha_cab]
+    df = df.iloc[linha_cab + 1:]
 
-    # Comparar colunas
-    faltando = [c for c in colunas_esperadas if c not in colunas_encontradas]
-    extras = [c for c in colunas_encontradas if c not in colunas_esperadas]
+    # apagar colunas Unnamed
+    df = df.loc[:, ~df.columns.astype(str).str.contains("Unnamed")]
 
-    # Erros detectados
+    # reset index
+    df = df.reset_index(drop=True)
+
+    st.success(f"✔ Cabeçalho encontrado na linha {linha_cab+1} e corrigido.")
+    return df
+
+
+# ============================================================
+# VALIDAR COLUNAS
+# ============================================================
+def validar(df, esperado, nome_aba):
+    st.subheader(f"📌 Validação da aba {nome_aba}")
+
+    col_df = [c.strip() for c in df.columns]
+
+    faltando = [c for c in esperado if c not in col_df]
+    extras = [c for c in col_df if c not in esperado]
+
     if faltando:
         st.error("❌ COLUNAS FALTANDO:")
         st.write(faltando)
-        st.info("💡 **Correção sugerida:** Verifique nomes, acentos, espaços e letras maiúsculas/minúsculas.")
+    else:
+        st.success("✔ Todas as colunas obrigatórias estão presentes.")
 
     if extras:
-        st.warning("⚠️ COLUNAS EXTRAS (não esperadas):")
+        st.warning("⚠ COLUNAS EXTRAS:")
         st.write(extras)
-        st.info("💡 **Correção sugerida:** Avalie se estas colunas deveriam existir ou se têm nome errado.")
 
-    if not faltando and not extras:
-        st.success("🎉 Todas as colunas estão corretas!")
-
-    # Mostrar a aba
-    st.subheader("📄 Pré-visualização dos dados")
     st.dataframe(df)
 
     return df
 
-# =====================================================
-# EXECUTAR DIAGNÓSTICO ABA POR ABA
-# =====================================================
+
+# ============================================================
+# CONVERSÃO DE VALORES MONETÁRIOS
+# ============================================================
+def converter_moeda(df, colunas):
+    for c in colunas:
+        if c in df.columns:
+            try:
+                df[c] = (
+                    df[c]
+                    .astype(str)
+                    .str.replace("R$", "", regex=False)
+                    .str.replace(".", "", regex=False)
+                    .str.replace(",", ".", regex=False)
+                )
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+            except:
+                st.error(f"Erro ao converter moeda na coluna {c}")
+    return df
+
+
+# ============================================================
+# PROCESSAR TODAS AS ABAS
+# ============================================================
 dfs = {}
 
-for aba in regras.keys():
-    if aba in abas:
-        df = diagnosticar_aba(aba, regras[aba])
-        dfs[aba] = df
-    else:
-        st.error(f"❌ A aba **{aba}** NÃO existe no arquivo!")
-        st.info(f"💡 Crie a aba {aba} na planilha ou verifique se o nome está escrito exatamente assim.")
+for aba in colunas_esperadas.keys():
 
+    if aba not in abas:
+        st.error(f"❌ A aba {aba} não existe na planilha!")
+        continue
 
-# =====================================================
-# TENTAR CONVERTER CAMPOS DE DINHEIRO
-# =====================================================
-def converter_valores(df, campos):
-    for c in campos:
-        if c not in df.columns:
-            continue
-        try:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-        except:
-            st.error(f"❌ Erro ao converter valor monetário da coluna {c}")
+    # Carregar bruto
+    bruto = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
 
-if dfs.get("VENDAS") is not None:
-    converter_valores(dfs["VENDAS"], ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO"])
+    # Corrigir cabeçalho
+    limpo = limpar_aba(bruto, aba)
 
-if dfs.get("COMPRAS") is not None:
-    converter_valores(dfs["COMPRAS"], ["CUSTO UNITÁRIO", "CUSTO TOTAL"])
+    if limpo is None:
+        continue
 
-if dfs.get("ESTOQUE") is not None:
-    converter_valores(dfs["ESTOQUE"], ["Media C. UNITARIO", "Valor Venda Sugerido"])
+    # Validar colunas
+    validado = validar(limpo, colunas_esperadas[aba], aba)
 
-st.success("💰 Conversão monetária executada (onde possível).")
+    # Conversão de moedas
+    if aba == "ESTOQUE":
+        validado = converter_moeda(validado, ["Media C. UNITARIO", "Valor Venda Sugerido"])
+    elif aba == "VENDAS":
+        validado = converter_moeda(validado, ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO"])
+    elif aba == "COMPRAS":
+        validado = converter_moeda(validado, ["CUSTO UNITÁRIO", "CUSTO TOTAL"])
 
+    st.success(f"✔ Aba {aba} processada com sucesso!")
+    dfs[aba] = validado
+
+st.success("🎉 Processamento concluído. Se tudo estiver verde, já podemos montar o dashboard!")
