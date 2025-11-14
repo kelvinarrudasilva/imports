@@ -1,36 +1,37 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-st.set_page_config(page_title="Diagnóstico Automático", layout="wide")
-st.title("🛠️ Diagnóstico + Correção Automática da Planilha")
+st.set_page_config(page_title="Dashboard Loja Importados", layout="wide")
 
+st.title("📊 Dashboard Loja Importados")
+
+# ============================
+# LINK FIXO
+# ============================
 URL_PLANILHA = "https://drive.google.com/uc?export=download&id=1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b"
 
-# ============================================================
-# FUNÇÃO BASE PARA CARREGAR ARQUIVO
-# ============================================================
+# ============================
+# FUNÇÃO BASE PARA CARREGAR XLS
+# ============================
 def carregar_xls(url):
     try:
-        xls = pd.ExcelFile(url)
-        return xls, None
+        return pd.ExcelFile(url), None
     except Exception as e:
         return None, str(e)
 
-
 xls, erro = carregar_xls(URL_PLANILHA)
-
 if erro:
-    st.error("❌ ERRO AO LER O ARQUIVO")
+    st.error("Erro ao abrir planilha.")
     st.code(erro)
     st.stop()
 
-# ignora aba EXCELENTEJOAO
+# ignorar aba EXCELENTEJOAO
 abas = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
-st.write("📄 Abas detectadas:", abas)
 
-# ============================================================
+# ============================
 # COLUNAS ESPERADAS
-# ============================================================
+# ============================
 colunas_esperadas = {
     "ESTOQUE": [
         "PRODUTO", "EM ESTOQUE", "COMPRAS",
@@ -47,11 +48,10 @@ colunas_esperadas = {
     ]
 }
 
-# ============================================================
+# ============================
 # DETECTOR DE CABEÇALHO
-# ============================================================
+# ============================
 def limpar_aba(df, nome_aba):
-    st.subheader(f"🔧 Limpando aba **{nome_aba}**")
 
     busca = "PRODUTO" if nome_aba != "VENDAS" and nome_aba != "COMPRAS" else "DATA"
 
@@ -63,104 +63,64 @@ def limpar_aba(df, nome_aba):
             break
 
     if linha_cab is None:
-        st.error(f"⚠ Não encontrei o cabeçalho da aba {nome_aba}.")
         return None
 
-    # define cabeçalho real
     df.columns = df.iloc[linha_cab]
     df = df.iloc[linha_cab + 1:]
-
-    # apagar colunas Unnamed
     df = df.loc[:, ~df.columns.astype(str).str.contains("Unnamed")]
-
-    # reset index
     df = df.reset_index(drop=True)
 
-    st.success(f"✔ Cabeçalho encontrado na linha {linha_cab+1} e corrigido.")
     return df
 
+# ============================
+# VALIDAÇÃO
+# ============================
+def validar(df, esperado):
 
-# ============================================================
-# VALIDAR COLUNAS
-# ============================================================
-def validar(df, esperado, nome_aba):
-    st.subheader(f"📌 Validação da aba {nome_aba}")
-
-    # converter qualquer valor de coluna para string
     col_df = [str(c).strip() for c in df.columns]
-
-    # atualizar nomes da coluna no DataFrame
     df.columns = col_df
 
-    # remover colunas vazias, NaN e "Unnamed"
     df = df.loc[:, ~df.columns.str.contains("Unnamed", case=False)]
     df = df.loc[:, df.columns != ""]
     df = df.loc[:, df.columns != "nan"]
 
-    col_df = df.columns.tolist()
-
-    faltando = [c for c in esperado if c not in col_df]
-    extras  = [c for c in col_df if c not in esperado]
-
-    if faltando:
-        st.error("❌ COLUNAS FALTANDO:")
-        st.write(faltando)
-    else:
-        st.success("✔ Todas as colunas obrigatórias estão presentes.")
-
-    if extras:
-        st.warning("⚠ COLUNAS EXTRAS:")
-        st.write(extras)
-
-    st.subheader("📄 Pré-visualização (limpo):")
-    st.dataframe(df)
-
     return df
 
-# ============================================================
-# CONVERSÃO DE VALORES MONETÁRIOS
-# ============================================================
+# ============================
+# CONVERTER MOEDAS
+# ============================
 def converter_moeda(df, colunas):
     for c in colunas:
         if c in df.columns:
-            try:
-                df[c] = (
-                    df[c]
-                    .astype(str)
-                    .str.replace("R$", "", regex=False)
-                    .str.replace(".", "", regex=False)
-                    .str.replace(",", ".", regex=False)
-                )
-                df[c] = pd.to_numeric(df[c], errors="coerce")
-            except:
-                st.error(f"Erro ao converter moeda na coluna {c}")
+            df[c] = (
+                df[c]
+                .astype(str)
+                .str.replace("R$", "", regex=False)
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+            )
+            df[c] = pd.to_numeric(df[c], errors="coerce")
     return df
 
-
-# ============================================================
+# ============================
 # PROCESSAR TODAS AS ABAS
-# ============================================================
+# ============================
 dfs = {}
 
 for aba in colunas_esperadas.keys():
 
     if aba not in abas:
-        st.error(f"❌ A aba {aba} não existe na planilha!")
         continue
 
-    # Carregar bruto
     bruto = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
-
-    # Corrigir cabeçalho
     limpo = limpar_aba(bruto, aba)
 
     if limpo is None:
         continue
 
-    # Validar colunas
-    validado = validar(limpo, colunas_esperadas[aba], aba)
+    validado = validar(limpo, colunas_esperadas[aba])
 
-    # Conversão de moedas
+    # conversão de moedas
     if aba == "ESTOQUE":
         validado = converter_moeda(validado, ["Media C. UNITARIO", "Valor Venda Sugerido"])
     elif aba == "VENDAS":
@@ -168,8 +128,89 @@ for aba in colunas_esperadas.keys():
     elif aba == "COMPRAS":
         validado = converter_moeda(validado, ["CUSTO UNITÁRIO", "CUSTO TOTAL"])
 
-    st.success(f"✔ Aba {aba} processada com sucesso!")
     dfs[aba] = validado
 
-st.success("🎉 Processamento concluído. Se tudo estiver verde, já podemos montar o dashboard!")
+# ============================
+# DASHBOARDS
+# ============================
+st.header("📈 Dashboards")
 
+tabs = st.tabs(["📦 Estoque", "🛒 Vendas", "📥 Compras", "📄 Dados Brutos"])
+
+# ============================================================
+# ESTOQUE
+# ============================================================
+with tabs[0]:
+    if "ESTOQUE" in dfs:
+        df = dfs["ESTOQUE"]
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Produtos cadastrados", df["PRODUTO"].nunique())
+        col2.metric("Total em estoque", df["EM ESTOQUE"].sum())
+        col3.metric("Total vendido (qtde)", df["VENDAS"].sum())
+
+        fig = px.bar(
+            df.sort_values("VENDAS", ascending=False).head(20),
+            x="PRODUTO", y="VENDAS",
+            title="Top 20 Produtos Mais Vendidos"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# VENDAS
+# ============================================================
+with tabs[1]:
+    if "VENDAS" in dfs:
+        df = dfs["VENDAS"]
+
+        df["DATA"] = pd.to_datetime(df["DATA"], errors="coerce")
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Faturamento Total", f"R$ {df['VALOR TOTAL'].sum():,.2f}")
+        col2.metric("Lucro Total", f"R$ {df['LUCRO UNITARIO'].sum():,.2f}")
+        col3.metric("Itens vendidos", df["QTD"].sum())
+
+        # Faturamento diário
+        fig = px.line(
+            df.groupby("DATA")["VALOR TOTAL"].sum().reset_index(),
+            x="DATA", y="VALOR TOTAL",
+            title="Faturamento Diário"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Ranking
+        fig2 = px.bar(
+            df.groupby("PRODUTO")["QTD"].sum().reset_index().sort_values("QTD", ascending=False).head(20),
+            x="PRODUTO", y="QTD",
+            title="Top 20 Produtos Vendidos"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+# ============================================================
+# COMPRAS
+# ============================================================
+with tabs[2]:
+    if "COMPRAS" in dfs:
+        df = dfs["COMPRAS"]
+        df["DATA"] = pd.to_datetime(df["DATA"], errors="coerce")
+
+        col1, col2 = st.columns(2)
+        col1.metric("Compras registradas", len(df))
+        col2.metric("Custo Total Compras", f"R$ {df['CUSTO TOTAL'].sum():,.2f}")
+
+        fig = px.line(
+            df.groupby("DATA")["CUSTO TOTAL"].sum().reset_index(),
+            x="DATA", y="CUSTO TOTAL",
+            title="Total de Compras por Dia"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# DADOS BRUTOS
+# ============================================================
+with tabs[3]:
+    for k, v in dfs.items():
+        st.subheader(k)
+        st.dataframe(v, use_container_width=True)
