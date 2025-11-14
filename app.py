@@ -1,4 +1,4 @@
-# app.py — Dashboard Loja Importados final + hover detalhado + estoque ordenado + pesquisa produto
+# app.py — Dashboard Loja Importados final + hover detalhado + estoque ordenado + pesquisa
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -16,17 +16,29 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # VISUAL
 # ----------------------------
 st.markdown("""
-    <style>
-      :root { --accent:#1aa3ff; --accent-dark:#0066cc; }
-      body, .stApp { background-color:#ffffff; color:#111; }
-      h1,h2,h3,h4 { color: var(--accent-dark); }
-      .stDataFrame thead th { background-color:#f0f8ff;}
-      .kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
-      .kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
-    </style>
+<style>
+:root { --accent:#1aa3ff; --accent-dark:#0066cc; }
+body, .stApp { background-color:#ffffff; color:#111; }
+h1,h2,h3,h4 { color: var(--accent-dark); }
+.stDataFrame thead th { background-color:#f0f8ff;}
+.kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
+.kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
+
+/* Aba ativa e inativa com fundo colorido */
+div[role="tab"] {
+    background-color: #e0e0e0 !important;
+    color: #111 !important;
+    border-radius: 8px 8px 0 0;
+    padding: 5px 15px;
+    margin-right: 5px;
+    font-weight: 600;
+}
+div[role="tab"]:hover { background-color: #c0c0c0 !important; }
+div[role="tab"][data-selected="true"] { background-color: #1aa3ff !important; color: white !important; }
+</style>
 """, unsafe_allow_html=True)
 
 st.title("📊 Loja Importados — Dashboard")
@@ -254,8 +266,8 @@ with tabs[1]:
             text="VALOR_TOTAL",
             hover_data={"QTD_TOTAL": True, "VALOR_TOTAL":":.2f"}
         )
-        fig.update_traces(texttemplate="%{text:,.2f}")
-        fig.update_yaxes(tickprefix="R$ ", separatethousands=True)
+        fig.update_traces(textposition="inside")
+        fig.update_yaxes(tickprefix="R$ ", separatorthousands=True)
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(formatar_valor_reais(top_val, ["VALOR_TOTAL"]), use_container_width=True)
     else:
@@ -295,8 +307,8 @@ with tabs[3]:
             text="LUCRO_TOTAL",
             hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL":":.2f"}
         )
-        fig3.update_traces(texttemplate="%{text:,.2f}")
-        fig3.update_yaxes(tickprefix="R$ ", separatethousands=True)
+        fig3.update_traces(textposition="inside")
+        fig3.update_yaxes(tickprefix="R$ ", separatorthousands=True)
         st.plotly_chart(fig3, use_container_width=True)
         st.dataframe(formatar_valor_reais(top_lucro, ["LUCRO_TOTAL"]), use_container_width=True)
     else:
@@ -319,17 +331,11 @@ with tabs[4]:
 # ----------------------------
 # Aba PESQUISAR PRODUTO
 with tabs[5]:
-    st.subheader("🔍 Pesquisar produto pelo nome")
-    busca_produto = st.text_input("Digite o nome ou parte do produto:")
-    if busca_produto:
-        if not estoque_df.empty:
-            df_busca = estoque_df[estoque_df["PRODUTO"].str.contains(busca_produto, case=False, na=False)].copy()
-            if not df_busca.empty:
-                df_busca = formatar_valor_reais(df_busca, ["Media C. UNITARIO","Valor Venda Sugerido"])
-                st.dataframe(df_busca.reset_index(drop=True), use_container_width=True)
-            else:
-                st.warning("Nenhum produto encontrado.")
-        else:
-            st.warning("A aba ESTOQUE não possui dados.")
-
-st.success("✅ Dashboard carregado com sucesso!")
+    st.subheader("🔍 Pesquisar Produto no Estoque")
+    nome_produto = st.text_input("Digite o nome do produto:")
+    if nome_produto.strip() != "":
+        df_search = estoque_df.copy()
+        df_search = df_search[df_search["PRODUTO"].str.contains(nome_produto, case=False, na=False)]
+        if not df_search.empty:
+            df_search = formatar_valor_reais(df_search, ["Media C. UNITARIO","Valor Venda Sugerido"])
+            st.dataframe(df_search.reset_index(drop=True
