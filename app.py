@@ -1,4 +1,4 @@
-# app.py — Dashboard final com valores em R$, Top10 Lucro, filtros e abas
+# app.py — Dashboard final, valores em R$, Top10 Valor/Quantidade/Lucro
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -14,16 +14,13 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # ----------------------------
 # VISUAL
 # ----------------------------
-st.markdown(
-    """
-    <style>
-      :root { --gold:#FFD700; }
-      body, .stApp { background-color:#0b0b0b; color:#EEE; }
-      h1,h2,h3,h4 { color: var(--gold); }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown("""
+<style>
+:root { --gold:#FFD700; }
+body, .stApp { background-color:#0b0b0b; color:#EEE; }
+h1,h2,h3,h4 { color: var(--gold); }
+</style>
+""", unsafe_allow_html=True)
 st.title("📊 Loja Importados — Dashboard")
 
 # ----------------------------
@@ -36,7 +33,7 @@ def parse_money_value(x):
     except:
         pass
     s = str(x).strip()
-    if s == "" or s.lower() == "nan":
+    if s=="" or s.lower()=="nan":
         return float("nan")
     s = re.sub(r"[^\d\.,\-]", "", s)
     if "." in s and "," in s:
@@ -44,11 +41,11 @@ def parse_money_value(x):
     else:
         if "," in s and "." not in s:
             s = s.replace(",", ".")
-        if s.count(".") > 1:
+        if s.count(".")>1:
             s = s.replace(".", "")
     s = re.sub(r"[^\d\.\-]", "", s)
     try:
-        return float(s) if s not in ("", ".", "-") else float("nan")
+        return float(s)
     except:
         return float("nan")
 
@@ -64,7 +61,7 @@ def parse_int_series(serie):
             pass
         s = str(x)
         s = re.sub(r"[^\d\-]", "", s)
-        if s == "" or s == "-" or s.lower() == "nan":
+        if s=="" or s=="-" or s.lower()=="nan":
             return pd.NA
         try:
             return int(float(s))
@@ -97,7 +94,7 @@ def limpar_aba_raw(df_raw, nome_aba):
     return df
 
 # ----------------------------
-# CARREGAR XLSX E ABAS
+# CARREGAR XLSX
 # ----------------------------
 try:
     xls = pd.ExcelFile(URL_PLANILHA)
@@ -108,22 +105,15 @@ except Exception as e:
 
 abas_all = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
 
+# colunas esperadas
 colunas_esperadas = {
-    "ESTOQUE": [
-        "PRODUTO", "EM ESTOQUE", "COMPRAS",
-        "Media C. UNITARIO", "Valor Venda Sugerido", "VENDAS"
-    ],
-    "VENDAS": [
-        "DATA", "PRODUTO", "QTD", "VALOR VENDA", "VALOR TOTAL",
-        "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO", "MAKEUP",
-        "% DE LUCRO SOBRE CUSTO", "STATUS", "CLIENTE", "OBS"
-    ],
-    "COMPRAS": [
-        "DATA", "PRODUTO", "STATUS",
-        "QUANTIDADE", "CUSTO UNITÁRIO", "CUSTO TOTAL"
-    ]
+    "ESTOQUE": ["PRODUTO","EM ESTOQUE","COMPRAS","Media C. UNITARIO","Valor Venda Sugerido","VENDAS"],
+    "VENDAS": ["DATA","PRODUTO","QTD","VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO",
+               "LUCRO UNITARIO","MAKEUP","% DE LUCRO SOBRE CUSTO","STATUS","CLIENTE","OBS"],
+    "COMPRAS": ["DATA","PRODUTO","STATUS","QUANTIDADE","CUSTO UNITÁRIO","CUSTO TOTAL"]
 }
 
+# ler e limpar abas
 dfs = {}
 for aba in colunas_esperadas.keys():
     if aba not in abas_all:
@@ -136,25 +126,23 @@ for aba in colunas_esperadas.keys():
     dfs[aba] = limpo
 
 # ----------------------------
-# CONVERSÃO CAMPOS
+# CONVERTER CAMPOS
 # ----------------------------
 # ESTOQUE
 if "ESTOQUE" in dfs:
     df_e = dfs["ESTOQUE"]
-    if "Media C. UNITARIO" in df_e.columns:
-        df_e["Media C. UNITARIO"] = parse_money_series(df_e["Media C. UNITARIO"])
-    if "Valor Venda Sugerido" in df_e.columns:
-        df_e["Valor Venda Sugerido"] = parse_money_series(df_e["Valor Venda Sugerido"])
-    if "EM ESTOQUE" in df_e.columns:
-        df_e["EM ESTOQUE"] = parse_int_series(df_e["EM ESTOQUE"]).fillna(0)
-    if "VENDAS" in df_e.columns:
-        df_e["VENDAS"] = parse_int_series(df_e["VENDAS"]).fillna(0)
+    for c in ["Media C. UNITARIO","Valor Venda Sugerido"]:
+        if c in df_e.columns:
+            df_e[c] = parse_money_series(df_e[c])
+    for c in ["EM ESTOQUE","VENDAS"]:
+        if c in df_e.columns:
+            df_e[c] = parse_int_series(df_e[c]).fillna(0)
     dfs["ESTOQUE"] = df_e
 
 # VENDAS
 if "VENDAS" in dfs:
     df_v = dfs["VENDAS"]
-    for c in ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO"]:
+    for c in ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"]:
         if c in df_v.columns:
             df_v[c] = parse_money_series(df_v[c])
     if "QTD" in df_v.columns:
@@ -199,24 +187,15 @@ mes_selecionado = st.selectbox("Filtrar por mês (YYYY-MM):", mes_opcoes, index=
 def filtrar_mes(df, mes):
     if df is None or df.empty:
         return pd.DataFrame()
-    if mes == "Todos" or mes is None:
+    if mes=="Todos" or mes is None:
         return df
     if "MES_ANO" in df.columns:
-        return df[df["MES_ANO"] == mes].copy()
+        return df[df["MES_ANO"]==mes].copy()
     return df
 
 vendas_filtradas = filtrar_mes(dfs.get("VENDAS", pd.DataFrame()), mes_selecionado)
 compras_filtradas = filtrar_mes(dfs.get("COMPRAS", pd.DataFrame()), mes_selecionado)
 estoque_df = dfs.get("ESTOQUE", pd.DataFrame())
-
-# ----------------------------
-# FUNÇÃO FORMATAR REAIS
-# ----------------------------
-def formatar_reais(df, colunas):
-    for c in colunas:
-        if c in df.columns:
-            df[c] = df[c].fillna(0.0).map(lambda x: f"R$ {x:,.2f}")
-    return df
 
 # ----------------------------
 # KPIs
@@ -225,7 +204,7 @@ def calcular_totais_vendas(df):
     if df is None or df.empty:
         return 0.0, 0.0
     total_vendido = df["VALOR TOTAL"].sum() if "VALOR TOTAL" in df.columns else 0.0
-    total_lucro = (df["LUCRO UNITARIO"] * df["QTD"]).sum() if "LUCRO UNITARIO" in df.columns and "QTD" in df.columns else 0.0
+    total_lucro = (df["LUCRO UNITARIO"]*df["QTD"]).sum() if "LUCRO UNITARIO" in df.columns else 0.0
     return float(total_vendido), float(total_lucro)
 
 total_vendido, total_lucro = calcular_totais_vendas(vendas_filtradas)
@@ -239,75 +218,69 @@ k3.metric("💸 Total Compras (R$)", f"R$ {total_compras:,.2f}")
 # ----------------------------
 # Abas
 # ----------------------------
-tabs = st.tabs(["🛒 VENDAS", "🏆 TOP10 (VALOR)", "🏅 TOP10 (QUANTIDADE)", "📊 TOP10 LUCRO", "📦 CONSULTAR ESTOQUE"])
+tabs = st.tabs(["🛒 VENDAS", "🏆 TOP10 (VALOR)", "🏅 TOP10 (QUANTIDADE)", "💰 TOP10 LUCRO", "📦 CONSULTAR ESTOQUE"])
 
-# Aba Vendas
+# VENDAS
 with tabs[0]:
     st.subheader("Vendas (período selecionado)")
     if vendas_filtradas.empty:
-        st.info("Sem dados de vendas para o período selecionado.")
+        st.info("Sem dados para o período selecionado.")
     else:
-        dfv_display = vendas_filtradas.copy()
-        dfv_display = formatar_reais(dfv_display, ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO"])
-        st.dataframe(dfv_display, use_container_width=True)
+        df_disp = vendas_filtradas.copy()
+        for c in ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"]:
+            if c in df_disp.columns:
+                df_disp[c] = df_disp[c].map(lambda x: f"R$ {x:,.2f}")
+        st.dataframe(df_disp, use_container_width=True)
 
-# Top10 VALOR
+# TOP10 VALOR
 with tabs[1]:
     st.subheader("Top 10 — por VALOR (R$)")
-    if vendas_filtradas.empty:
-        st.info("Sem dados de vendas para o período selecionado.")
-    else:
-        dfv = vendas_filtradas.copy()
-        dfv["VALOR_TOTAL"] = dfv["VALOR TOTAL"] if "VALOR TOTAL" in dfv.columns else dfv["VALOR VENDA"]*dfv["QTD"]
-        top_val = dfv.groupby("PRODUTO")[["VALOR_TOTAL", "QTD"]].sum().reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
-        fig = px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL",
-                     text=top_val["VALOR_TOTAL"].map(lambda x: f"R$ {x:,.2f}"),
-                     hover_data={"VALOR_TOTAL":[f"R$ {x:,.2f}" for x in top_val["VALOR_TOTAL"]],
-                                 "QTD": True})
+    if not vendas_filtradas.empty:
+        top_val = (vendas_filtradas.groupby("PRODUTO")["VALOR TOTAL"].sum()
+                   .reset_index().sort_values("VALOR TOTAL", ascending=False).head(10))
+        top_val["VALOR_TOTAL_FMT"] = top_val["VALOR TOTAL"].map(lambda x: f"R$ {x:,.2f}")
+        fig = px.bar(top_val, x="PRODUTO", y="VALOR TOTAL", text="VALOR_TOTAL_FMT",
+                     color_discrete_sequence=["#FFD700"])
         fig.update_traces(textposition="inside")
         st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(formatar_reais(top_val.copy(), ["VALOR_TOTAL"]).rename(columns={"QTD":"Quantidade"}))
+        st.dataframe(top_val[["PRODUTO","VALOR TOTAL"]].rename(columns={"VALOR TOTAL":"VALOR_TOTAL"}).style.format({"VALOR_TOTAL":"R$ {:,.2f}"}))
 
-# Top10 QUANTIDADE
+# TOP10 QUANTIDADE
 with tabs[2]:
     st.subheader("Top 10 — por QUANTIDADE")
-    if vendas_filtradas.empty:
-        st.info("Sem dados de vendas para o período selecionado.")
-    else:
-        dfv = vendas_filtradas.copy()
-        top_q = dfv.groupby("PRODUTO")[["QTD", "VALOR TOTAL"]].sum().reset_index().sort_values("QTD", ascending=False).head(10)
-        fig2 = px.bar(top_q, x="PRODUTO", y="QTD",
-                      text=top_q["QTD"].astype(int).astype(str),
-                      hover_data={"QTD": True, "VALOR TOTAL":[f"R$ {x:,.2f}" for x in top_q["VALOR TOTAL"]]})
+    if not vendas_filtradas.empty:
+        top_q = (vendas_filtradas.groupby("PRODUTO")["QTD"].sum()
+                 .reset_index().sort_values("QTD", ascending=False).head(10))
+        fig2 = px.bar(top_q, x="PRODUTO", y="QTD", text="QTD",
+                      color_discrete_sequence=["#1E90FF"])
         fig2.update_traces(textposition="inside")
         st.plotly_chart(fig2, use_container_width=True)
-        st.dataframe(top_q.rename(columns={"QTD":"Quantidade"}).style.format({"VALOR TOTAL":"R$ {:,.2f}"}))
+        st.dataframe(top_q.style.format({"QTD":"{:,.0f}"}))
 
-# Top10 LUCRO
+# TOP10 LUCRO
 with tabs[3]:
     st.subheader("Top 10 — por LUCRO (R$)")
-    if vendas_filtradas.empty:
-        st.info("Sem dados de vendas para o período selecionado.")
-    else:
-        dfv = vendas_filtradas.copy()
-        dfv["LUCRO_TOTAL"] = dfv["LUCRO UNITARIO"] * dfv["QTD"]
-        top_l = dfv.groupby("PRODUTO")[["LUCRO_TOTAL", "QTD"]].sum().reset_index().sort_values("LUCRO_TOTAL", ascending=False).head(10)
-        fig3 = px.bar(top_l, x="PRODUTO", y="LUCRO_TOTAL",
-                      text=top_l["LUCRO_TOTAL"].map(lambda x: f"R$ {x:,.2f}"),
-                      hover_data={"LUCRO_TOTAL":[f"R$ {x:,.2f}" for x in top_l["LUCRO_TOTAL"]],"QTD":True})
+    if not vendas_filtradas.empty and "LUCRO UNITARIO" in vendas_filtradas.columns:
+        top_l = (vendas_filtradas.assign(LUCRO_TOTAL = vendas_filtradas["LUCRO UNITARIO"]*vendas_filtradas["QTD"])
+                 .groupby("PRODUTO")["LUCRO_TOTAL"].sum().reset_index()
+                 .sort_values("LUCRO_TOTAL", ascending=False).head(10))
+        top_l["LUCRO_TOTAL_FMT"] = top_l["LUCRO_TOTAL"].map(lambda x: f"R$ {x:,.2f}")
+        fig3 = px.bar(top_l, x="PRODUTO", y="LUCRO_TOTAL", text="LUCRO_TOTAL_FMT",
+                      color_discrete_sequence=["#32CD32"])
         fig3.update_traces(textposition="inside")
         st.plotly_chart(fig3, use_container_width=True)
-        st.dataframe(formatar_reais(top_l.copy(), ["LUCRO_TOTAL"]).rename(columns={"QTD":"Quantidade"}))
+        st.dataframe(top_l[["PRODUTO","LUCRO_TOTAL"]].style.format({"LUCRO_TOTAL":"R$ {:,.2f}"}))
 
-# Aba Estoque
+# CONSULTAR ESTOQUE
 with tabs[4]:
     st.subheader("Consulta completa do Estoque")
     if estoque_df.empty:
         st.info("Aba ESTOQUE não encontrada ou vazia.")
     else:
         df_e = estoque_df.copy()
-        df_e = formatar_reais(df_e, ["Media C. UNITARIO", "Valor Venda Sugerido"])
-        df_e["EM ESTOQUE"] = df_e["EM ESTOQUE"].fillna(0).astype(int)
-        st.dataframe(df_e.sort_values("PRODUTO").reset_index(drop=True), use_container_width=True)
+        for c in ["Media C. UNITARIO","Valor Venda Sugerido"]:
+            if c in df_e.columns:
+                df_e[c] = df_e[c].map(lambda x: f"R$ {x:,.2f}")
+        st.dataframe(df_e.sort_values(by="PRODUTO").reset_index(drop=True), use_container_width=True)
 
 st.success("✅ Dashboard carregado com sucesso!")
