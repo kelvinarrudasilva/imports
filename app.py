@@ -211,7 +211,6 @@ k3.metric("💸 Total Compras (R$)", f"R$ {total_compras:,.2f}")
 # ----------------------------
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QUANTIDADE)","💰 TOP10 LUCRO","📦 CONSULTAR ESTOQUE"])
 
-# Função para preparar vendas
 def preparar_tabela_vendas(df):
     df_show = df.dropna(axis=1, how='all')
     if "DATA" in df_show.columns:
@@ -220,32 +219,40 @@ def preparar_tabela_vendas(df):
     return df_show
 
 # ----------------------------
-# Aba VENDAS
+# Aba VENDAS com gráfico "prédios"
 with tabs[0]:
     st.subheader("Vendas (período selecionado)")
-
-    # --- GRÁFICO ÚLTIMOS 6 MESES ---
+    
+    # --- GRÁFICO ESTILO "PRÉDIOS" ---
     if not vendas_filtradas.empty:
         df_6meses = vendas_filtradas.groupby("MES_ANO").agg(
             TOTAL_VENDIDO=("VALOR TOTAL", lambda x: x.fillna(0).sum()),
             TOTAL_LUCRO=("LUCRO UNITARIO", lambda x: (x.fillna(0) * vendas_filtradas.loc[x.index, "QTD"].fillna(0)).sum())
         ).reset_index().sort_values("MES_ANO", ascending=False).head(6)
-
-        df_6meses = df_6meses.sort_values("MES_ANO")  # ordenar do mais antigo para o mais recente
-
-        st.subheader("📊 Comparativo Últimos 6 Meses — Vendas x Lucro")
-        fig_6meses = px.bar(
+        df_6meses = df_6meses.sort_values("MES_ANO")
+        
+        fig_predios = px.bar(
             df_6meses,
             x="MES_ANO",
-            y=["TOTAL_VENDIDO", "TOTAL_LUCRO"],
-            barmode="group",
-            text_auto=".2s",
-            labels={"value": "R$", "MES_ANO": "Mês"},
-            color_discrete_map={"TOTAL_VENDIDO": "#1aa3ff", "TOTAL_LUCRO": "#0e8c4a"}
+            y="TOTAL_VENDIDO",
+            text=df_6meses["TOTAL_LUCRO"].map(lambda x: f"R$ {x:,.2f}"),
+            labels={"TOTAL_VENDIDO": "Valor Vendido (R$)", "MES_ANO": "Mês"},
+            color_discrete_sequence=["#1aa3ff"],
         )
-        fig_6meses.update_traces(textposition="outside")
-        fig_6meses.update_layout(yaxis_tickprefix="R$ ")
-        st.plotly_chart(fig_6meses, use_container_width=True)
+        fig_predios.update_traces(
+            textposition="inside",
+            marker_line_width=1.5,
+            marker_line_color="black"
+        )
+        fig_predios.update_layout(
+            yaxis_tickprefix="R$ ",
+            xaxis_tickangle=-45,
+            bargap=0.4,
+            title_font_size=16,
+            uniformtext_minsize=12,
+            uniformtext_mode='hide',
+        )
+        st.plotly_chart(fig_predios, use_container_width=True)
 
     # --- TABELA DE VENDAS ---
     if vendas_filtradas.empty:
@@ -260,9 +267,9 @@ with tabs[1]:
     if not vendas_filtradas.empty:
         dfv = vendas_filtradas.copy()
         if "VALOR TOTAL" not in dfv.columns:
-            dfv["VALOR_TOTAL"] = dfv["VALOR VENDA"].fillna(0)*dfv["QTD"].fillna(0)
+            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0)*dfv["QTD"].fillna(0)
         top_val = dfv.groupby("PRODUTO").agg(
-            VALOR_TOTAL=("VALOR_TOTAL","sum"),
+            VALOR_TOTAL=("VALOR TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
         fig = px.bar(
