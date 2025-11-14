@@ -215,7 +215,7 @@ k2.markdown(f'<div class="kpi-lucro"><h3>🧾 Total Lucro</h3><span>{formatar_re
 k3.markdown(f'<div class="kpi-compras"><h3>💸 Total Compras</h3><span>{formatar_reais(total_compras)}</span></div>', unsafe_allow_html=True)
 
 # ----------------------------
-# ABAS (mantidas igual)
+# ABAS
 # ----------------------------
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QUANTIDADE)","💰 TOP10 LUCRO","📦 CONSULTAR ESTOQUE"])
 
@@ -252,9 +252,14 @@ with tabs[1]:
             x="PRODUTO",
             y="VALOR_TOTAL",
             text="VALOR_TOTAL",
-            hover_data={"QTD_TOTAL": True, "VALOR_TOTAL":":.2f"}
+            hover_data={"QTD_TOTAL": True}
         )
-        fig.update_traces(textposition="inside")
+        fig.update_traces(
+            texttemplate='%{y:,.2f}',
+            textposition="inside",
+            hovertemplate="Produto: %{x}<br>Valor Total: R$ %{y:,.2f}<br>Qtd: %{customdata[0]}"
+        )
+        fig.update_yaxes(tickprefix="R$ ", separatorthousands=True)
         st.plotly_chart(fig, use_container_width=True)
         st.dataframe(formatar_valor_reais(top_val, ["VALOR_TOTAL"]), use_container_width=True)
     else:
@@ -292,9 +297,14 @@ with tabs[3]:
             x="PRODUTO",
             y="LUCRO_TOTAL",
             text="LUCRO_TOTAL",
-            hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL":":.2f"}
+            hover_data={"QTD_TOTAL": True}
         )
-        fig3.update_traces(textposition="inside")
+        fig3.update_traces(
+            texttemplate='%{y:,.2f}',
+            textposition="inside",
+            hovertemplate="Produto: %{x}<br>Lucro Total: R$ %{y:,.2f}<br>Qtd: %{customdata[0]}"
+        )
+        fig3.update_yaxes(tickprefix="R$ ", separatorthousands=True)
         st.plotly_chart(fig3, use_container_width=True)
         st.dataframe(formatar_valor_reais(top_lucro, ["LUCRO_TOTAL"]), use_container_width=True)
     else:
