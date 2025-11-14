@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import re
 from datetime import datetime
 
@@ -78,6 +79,12 @@ def formatar_valor_reais(df, colunas):
         if c in df.columns:
             df[c] = df[c].fillna(0.0).map(lambda x: f"R$ {x:,.2f}")
     return df
+
+def moeda_br(x):
+    try:
+        return f"R$ {x:,.2f}"
+    except:
+        return x
 
 # ----------------------------
 # DETECTAR CABEÇALHO / LIMPEZA
@@ -228,16 +235,127 @@ def preparar_tabela_vendas(df):
     return df_show
 
 # ----------------------------
+# Função: gráfico meses recentes (últimos N meses)
+# ----------------------------
+def grafico_ultimos_meses(df_vendas, n_mes=6):
+    """
+    Retorna um gráfico 'pseudo-3D' de barras por mês (últimos n_mes).
+    Usa duas camadas (sombra + frente) para efeito 3D e coloca o valor dentro da barra.
+    """
+    if df_vendas.empty or "MES_ANO" not in df_vendas.columns:
+        return None
+
+    # Agrupar por MES_ANO
+    tmp = df_vendas.copy()
+    if "VALOR TOTAL" not in tmp.columns:
+        tmp["VALOR TOTAL"] = tmp["VALOR VENDA"].fillna(0) * tmp["QTD"].fillna(0)
+    ag = tmp.groupby("MES_ANO").agg(TOTAL_VENDIDO=("VALOR TOTAL", "sum"),
+                                    QTD_TOTAL=("QTD", "sum")).reset_index()
+
+    # Ordenar MES_ANO cronologicamente
+    ag["MES_DT"] = pd.to_datetime(ag["MES_ANO"] + "-01", errors="coerce")
+    ag = ag.sort_values("MES_DT")
+
+    # Pegar últimos n_mes
+    if len(ag) == 0:
+        return None
+    ag_recent = ag.tail(n_mes).copy()
+    # Preparar rótulos
+    ag_recent["MES_LABEL"] = ag_recent["MES_DT"].dt.strftime("%b\n%Y")
+    ag_recent["TOTAL_LABEL"] = ag_recent["TOTAL_VENDIDO"].map(lambda x: f"R$ {x:,.0f}")
+
+    x = ag_recent["MES_LABEL"].tolist()
+    y = ag_recent["TOTAL_VENDIDO"].tolist()
+    y_qtd = ag_recent["QTD_TOTAL"].tolist()
+    text_labels = ag_recent["TOTAL_LABEL"].tolist()
+
+    # Criar figura com camada de sombra (offset negativo) + camada frontal (offset 0)
+    fig = go.Figure()
+
+    # Sombra (atrás) - um pouco deslocada e mais escura
+    fig.add_trace(go.Bar(
+        x=x,
+        y=[v * 0.98 for v in y],  # ligeiro ajuste para profundidade
+        marker=dict(color="rgba(10,40,80,0.25)", line=dict(width=0)),
+        width=0.6,
+        offset=-0.12,
+        hoverinfo="skip",
+        showlegend=False,
+    ))
+
+    # Barra principal (frente) com texto dentro
+    fig.add_trace(go.Bar(
+        x=x,
+        y=y,
+        marker=dict(color="rgba(26,163,255,0.9)", line=dict(color="rgba(0,0,0,0.05)", width=1)),
+        text=text_labels,
+        textposition="inside",
+        textfont=dict(size=12, color="white"),
+        width=0.6,
+        offset=0,
+        name="Faturamento (R$)",
+        hovertemplate="%{x}<br>Total Vendido: %{y:$,.2f}<br>Quantidade: %{customdata}<extra></extra>",
+        customdata=y_qtd
+    ))
+
+    # Linha de quantidade (eixo secundário como 'linha sobreposta')
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=y_qtd,
+        mode="lines+markers",
+        name="Quantidade vendida",
+        yaxis="y2",
+        marker=dict(size=8),
+        line=dict(width=3, dash="dot")
+    ))
+
+    # Layout com eixo secundário (quantidade)
+    fig.update_layout(
+        title="Últimos meses — Faturamento (barras) e Quantidade (linha)",
+        barmode="overlay",
+        xaxis=dict(title="Mês"),
+        yaxis=dict(title="Total Vendido (R$)"),
+        yaxis2=dict(title="Quantidade", overlaying="y", side="right", showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=40, r=40, t=60, b=40),
+        hovermode="x unified",
+        template="plotly_white"
+    )
+
+    # Um toque 3D-like: aplicar sombra adicional via shapes (sutileza estética)
+    # (não é 3D verdadeiro, mas dá sensação de profundidade)
+    for i, xi in enumerate(x):
+        # desenha uma sombra sutil atrás de cada barra
+        fig.add_shape(type="rect",
+                      x0=i - 0.35, x1=i - 0.05,
+                      y0=0, y1=max(y) * 0.02,
+                      xref="x", yref="y",
+                      fillcolor="rgba(0,0,0,0.02)",
+                      line=dict(width=0),
+                      layer="below")
+
+    return fig
+
+# ----------------------------
 # Aba VENDAS
 with tabs[0]:
     st.subheader("Vendas (período selecionado)")
+
+    # --- Gráfico no início: últimos meses (n = 6)
+    fig_mes = grafico_ultimos_meses(dfs.get("VENDAS", pd.DataFrame()), n_mes=6)
+    if fig_mes is not None:
+        st.plotly_chart(fig_mes, use_container_width=True)
+    else:
+        st.info("Dados insuficientes para gerar o gráfico de últimos meses.")
+
+    # Exibir tabela abaixo do gráfico
     if vendas_filtradas.empty:
         st.info("Sem dados de vendas para o período selecionado.")
     else:
         st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
 
         # ----------------------------
-        # GRÁFICO NOVO (pedido final)
+        # GRÁFICO NOVO (pedido final) — mantém detalhe diário abaixo se quiser
         # ----------------------------
         st.markdown("### 📊 Faturamento & Quantidade por Dia")
 
