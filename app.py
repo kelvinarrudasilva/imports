@@ -20,11 +20,15 @@ st.markdown("""
       :root { --accent:#1aa3ff; --accent-dark:#0066cc; }
       body, .stApp { background-color:#ffffff; color:#111; }
       h1,h2,h3,h4 { color: var(--accent-dark); }
-      .stMetric label { color:#333; }
-      .stMetric div { color: var(--accent); font-weight:700; }
       .stDataFrame thead th { background-color:#f0f8ff;}
+      .kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
+      .kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
+      .kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
+      .kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
+      .kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
     </style>
 """, unsafe_allow_html=True)
+
 st.title("📊 Loja Importados — Dashboard")
 
 # ----------------------------
@@ -76,8 +80,12 @@ def parse_int_series(serie):
 def formatar_valor_reais(df, colunas):
     for c in colunas:
         if c in df.columns:
-            df[c] = df[c].fillna(0.0).map(lambda x: f"R$ {x:,.2f}")
+            df[c] = df[c].fillna(0.0).map(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     return df
+
+def formatar_reais(valor):
+    """Formata float em reais: R$ 1.299,00"""
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # ----------------------------
 # DETECTAR CABEÇALHO / LIMPEZA
@@ -195,23 +203,22 @@ compras_filtradas = ordenar_data(filtrar_mes(dfs.get("COMPRAS", pd.DataFrame()),
 estoque_df = dfs.get("ESTOQUE", pd.DataFrame())
 
 # ----------------------------
-# KPIs
+# KPIs COM FUNDO COLORIDO
 # ----------------------------
 total_vendido = (vendas_filtradas["VALOR TOTAL"].fillna(0) if "VALOR TOTAL" in vendas_filtradas.columns else vendas_filtradas["VALOR VENDA"].fillna(0)*vendas_filtradas["QTD"].fillna(0)).sum()
 total_lucro = (vendas_filtradas["LUCRO UNITARIO"].fillna(0)*vendas_filtradas["QTD"].fillna(0)).sum() if "LUCRO UNITARIO" in vendas_filtradas.columns else 0
 total_compras = compras_filtradas["CUSTO TOTAL (RECALC)"].sum() if not compras_filtradas.empty else 0
 
 k1, k2, k3 = st.columns(3)
-k1.metric("💵 Total Vendido (R$)", f"R$ {total_vendido:,.2f}")
-k2.metric("🧾 Total Lucro (R$)", f"R$ {total_lucro:,.2f}")
-k3.metric("💸 Total Compras (R$)", f"R$ {total_compras:,.2f}")
+k1.markdown(f'<div class="kpi-vendas"><h3>💵 Total Vendido</h3><span>{formatar_reais(total_vendido)}</span></div>', unsafe_allow_html=True)
+k2.markdown(f'<div class="kpi-lucro"><h3>🧾 Total Lucro</h3><span>{formatar_reais(total_lucro)}</span></div>', unsafe_allow_html=True)
+k3.markdown(f'<div class="kpi-compras"><h3>💸 Total Compras</h3><span>{formatar_reais(total_compras)}</span></div>', unsafe_allow_html=True)
 
 # ----------------------------
-# ABAS
+# ABAS (mantidas igual)
 # ----------------------------
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QUANTIDADE)","💰 TOP10 LUCRO","📦 CONSULTAR ESTOQUE"])
 
-# Função para preparar vendas
 def preparar_tabela_vendas(df):
     df_show = df.dropna(axis=1, how='all')
     if "DATA" in df_show.columns:
