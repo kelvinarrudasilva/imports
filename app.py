@@ -1,175 +1,116 @@
-import streamlit as st
-import pandas as pd
+# ============================================================
+# ========================= DASHBOARD =========================
+# ============================================================
 
-st.set_page_config(page_title="Diagnóstico Automático", layout="wide")
-st.title("🛠️ Diagnóstico + Correção Automática da Planilha")
+st.title("📊 Dashboard Geral – Gestão Loja Importados")
 
-URL_PLANILHA = "https://drive.google.com/uc?export=download&id=1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b"
+# Criar referências
+estoque_df = dfs.get("ESTOQUE")
+vendas_df  = dfs.get("VENDAS")
+compras_df = dfs.get("COMPRAS")
+
+# Ajeitar datas
+if "DATA" in vendas_df.columns:
+    vendas_df["DATA"] = pd.to_datetime(vendas_df["DATA"], errors="coerce")
+if "DATA" in compras_df.columns:
+    compras_df["DATA"] = pd.to_datetime(compras_df["DATA"], errors="coerce")
 
 # ============================================================
-# FUNÇÃO BASE PARA CARREGAR ARQUIVO
+# KPI – Indicadores Gerais
 # ============================================================
-def carregar_xls(url):
-    try:
-        xls = pd.ExcelFile(url)
-        return xls, None
-    except Exception as e:
-        return None, str(e)
+st.subheader("📌 Indicadores Gerais")
 
+col1, col2, col3, col4 = st.columns(4)
 
-xls, erro = carregar_xls(URL_PLANILHA)
+# Faturamento total
+try:
+    fat_total = vendas_df["VALOR TOTAL"].sum()
+    col1.metric("💰 Faturamento Total", f"R$ {fat_total:,.2f}")
+except:
+    col1.metric("💰 Faturamento Total", "Erro")
 
-if erro:
-    st.error("❌ ERRO AO LER O ARQUIVO")
-    st.code(erro)
-    st.stop()
+# Lucro total
+try:
+    lucro_total = vendas_df["LUCRO UNITARIO"].sum()
+    col2.metric("📈 Lucro Total", f"R$ {lucro_total:,.2f}")
+except:
+    col2.metric("📈 Lucro Total", "Erro")
 
-# ignora aba EXCELENTEJOAO
-abas = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
-st.write("📄 Abas detectadas:", abas)
+# Ticket médio
+try:
+    ticket_medio = vendas_df["VALOR TOTAL"].mean()
+    col3.metric("🧾 Ticket Médio", f"R$ {ticket_medio:,.2f}")
+except:
+    col3.metric("🧾 Ticket Médio", "Erro")
 
-# ============================================================
-# COLUNAS ESPERADAS
-# ============================================================
-colunas_esperadas = {
-    "ESTOQUE": [
-        "PRODUTO", "EM ESTOQUE", "COMPRAS",
-        "Media C. UNITARIO", "Valor Venda Sugerido", "VENDAS"
-    ],
-    "VENDAS": [
-        "DATA", "PRODUTO", "QTD", "VALOR VENDA", "VALOR TOTAL",
-        "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO", "MAKEUP",
-        "% DE LUCRO SOBRE CUSTO", "STATUS", "CLIENTE", "OBS"
-    ],
-    "COMPRAS": [
-        "DATA", "PRODUTO", "STATUS",
-        "QUANTIDADE", "CUSTO UNITÁRIO", "CUSTO TOTAL"
-    ]
-}
+# Produtos cadastrados
+try:
+    total_produtos = estoque_df["PRODUTO"].nunique()
+    col4.metric("📦 Produtos Cadastrados", total_produtos)
+except:
+    col4.metric("📦 Produtos Cadastrados", "Erro")
 
 # ============================================================
-# DETECTOR DE CABEÇALHO
+# FILTROS
 # ============================================================
-def limpar_aba(df, nome_aba):
-    st.subheader(f"🔧 Limpando aba **{nome_aba}**")
+st.subheader("🔎 Filtros")
 
-    busca = "PRODUTO" if nome_aba != "VENDAS" and nome_aba != "COMPRAS" else "DATA"
+produtos_lista = vendas_df["PRODUTO"].dropna().unique().tolist()
+filtro_produto = st.multiselect("Filtrar produtos:", produtos_lista)
 
-    linha_cab = None
-    for i in range(len(df)):
-        linha = df.iloc[i].astype(str).str.upper().tolist()
-        if busca in " ".join(linha):
-            linha_cab = i
-            break
-
-    if linha_cab is None:
-        st.error(f"⚠ Não encontrei o cabeçalho da aba {nome_aba}.")
-        return None
-
-    # define cabeçalho real
-    df.columns = df.iloc[linha_cab]
-    df = df.iloc[linha_cab + 1:]
-
-    # apagar colunas Unnamed
-    df = df.loc[:, ~df.columns.astype(str).str.contains("Unnamed")]
-
-    # reset index
-    df = df.reset_index(drop=True)
-
-    st.success(f"✔ Cabeçalho encontrado na linha {linha_cab+1} e corrigido.")
-    return df
-
+if filtro_produto:
+    vendas_filtrado = vendas_df[vendas_df["PRODUTO"].isin(filtro_produto)]
+else:
+    vendas_filtrado = vendas_df.copy()
 
 # ============================================================
-# VALIDAR COLUNAS
+# GRÁFICO – Faturamento por Data
 # ============================================================
-def validar(df, esperado, nome_aba):
-    st.subheader(f"📌 Validação da aba {nome_aba}")
+st.subheader("📈 Evolução do Faturamento")
 
-    # converter qualquer valor de coluna para string
-    col_df = [str(c).strip() for c in df.columns]
-
-    # atualizar nomes da coluna no DataFrame
-    df.columns = col_df
-
-    # remover colunas vazias, NaN e "Unnamed"
-    df = df.loc[:, ~df.columns.str.contains("Unnamed", case=False)]
-    df = df.loc[:, df.columns != ""]
-    df = df.loc[:, df.columns != "nan"]
-
-    col_df = df.columns.tolist()
-
-    faltando = [c for c in esperado if c not in col_df]
-    extras  = [c for c in col_df if c not in esperado]
-
-    if faltando:
-        st.error("❌ COLUNAS FALTANDO:")
-        st.write(faltando)
-    else:
-        st.success("✔ Todas as colunas obrigatórias estão presentes.")
-
-    if extras:
-        st.warning("⚠ COLUNAS EXTRAS:")
-        st.write(extras)
-
-    st.subheader("📄 Pré-visualização (limpo):")
-    st.dataframe(df)
-
-    return df
+try:
+    fat_data = vendas_filtrado.groupby("DATA")["VALOR TOTAL"].sum().reset_index()
+    fig = px.line(fat_data, x="DATA", y="VALOR TOTAL",
+                  markers=True, title="Faturamento Diário")
+    st.plotly_chart(fig, use_container_width=True)
+except:
+    st.error("Não foi possível gerar gráfico de faturamento diário.")
 
 # ============================================================
-# CONVERSÃO DE VALORES MONETÁRIOS
+# GRÁFICO – Top 10 Produtos Mais Vendidos
 # ============================================================
-def converter_moeda(df, colunas):
-    for c in colunas:
-        if c in df.columns:
-            try:
-                df[c] = (
-                    df[c]
-                    .astype(str)
-                    .str.replace("R$", "", regex=False)
-                    .str.replace(".", "", regex=False)
-                    .str.replace(",", ".", regex=False)
-                )
-                df[c] = pd.to_numeric(df[c], errors="coerce")
-            except:
-                st.error(f"Erro ao converter moeda na coluna {c}")
-    return df
+st.subheader("🔥 Top 10 Produtos Mais Vendidos")
 
+try:
+    top10 = vendas_df.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(10)
+    fig = px.bar(top10, x=top10.index, y=top10.values,
+                 title="Top 10 Produtos Mais Vendidos")
+    st.plotly_chart(fig, use_container_width=True)
+except:
+    st.error("Erro ao gerar ranking de produtos.")
 
 # ============================================================
-# PROCESSAR TODAS AS ABAS
+# GRÁFICO – Produtos com Estoque Baixo
 # ============================================================
-dfs = {}
+st.subheader("🚨 Produtos com Estoque Baixo")
 
-for aba in colunas_esperadas.keys():
+try:
+    baixo = estoque_df[estoque_df["EM ESTOQUE"] < 5]
+    fig = px.bar(baixo, x="PRODUTO", y="EM ESTOQUE",
+                 title="Estoque Crítico (<5 unidades)")
+    st.plotly_chart(fig, use_container_width=True)
+except:
+    st.error("Erro ao gerar gráfico de estoque crítico.")
 
-    if aba not in abas:
-        st.error(f"❌ A aba {aba} não existe na planilha!")
-        continue
+# ============================================================
+# GRÁFICO – Evolução dos Custos (COMPRAS)
+# ============================================================
+st.subheader("📉 Evolução dos Gastos em Compras")
 
-    # Carregar bruto
-    bruto = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
-
-    # Corrigir cabeçalho
-    limpo = limpar_aba(bruto, aba)
-
-    if limpo is None:
-        continue
-
-    # Validar colunas
-    validado = validar(limpo, colunas_esperadas[aba], aba)
-
-    # Conversão de moedas
-    if aba == "ESTOQUE":
-        validado = converter_moeda(validado, ["Media C. UNITARIO", "Valor Venda Sugerido"])
-    elif aba == "VENDAS":
-        validado = converter_moeda(validado, ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO"])
-    elif aba == "COMPRAS":
-        validado = converter_moeda(validado, ["CUSTO UNITÁRIO", "CUSTO TOTAL"])
-
-    st.success(f"✔ Aba {aba} processada com sucesso!")
-    dfs[aba] = validado
-
-st.success("🎉 Processamento concluído. Se tudo estiver verde, já podemos montar o dashboard!")
-
+try:
+    comp = compras_df.groupby("DATA")["CUSTO TOTAL"].sum().reset_index()
+    fig = px.line(comp, x="DATA", y="CUSTO TOTAL",
+                  markers=True, title="Gastos com Compras")
+    st.plotly_chart(fig, use_container_width=True)
+except:
+    st.error("Erro ao gerar gráfico de compras.")
