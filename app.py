@@ -3,12 +3,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import re
-from io import BytesIO
 
 st.set_page_config(page_title="Dashboard Loja Importados", layout="wide")
 
 # --------------------------
-# Config visual (simples)
+# Visual simples
 # --------------------------
 st.markdown(
     """
@@ -32,86 +31,63 @@ URL_PLANILHA = "https://drive.google.com/uc?export=download&id=1TsRjsfw1TVfeEWBB
 # --------------------------
 # Helpers de limpeza/parse
 # --------------------------
-def parse_money_series(s):
-    """Tenta transformar uma série em float monetário robustamente."""
-    if s is None:
-        return pd.Series(dtype="float64")
-    # converter tudo para str
-    s2 = s.astype(str).fillna("")
-    # remover símbolos de moeda e espaços
-    s2 = s2.str.replace(r"[^\d,\-\.]", "", regex=True)
-    # se existir padrão com '.' como thousand and ',' as decimal (ex: 1.234,56)
-    # detectamos se contém both '.' e ',' and last ',' has 2 digits -> assume BR format
-    def parse_val(x):
-        if x is None or x == "" or x.lower() == "nan":
+def parse_money_value(x):
+    """Parse único valor em ponto flutuante, tolerante a formatos BR/EN e símbolos."""
+    try:
+        if pd.isna(x):
             return float("nan")
-        x = str(x).strip()
-        # if contains both . and , and comma appears in last 3 chars -> brazilian format
-        if "." in x and "," in x:
-            # replace dots (thousands) and comma to decimal
-            x = x.replace(".", "")
-            x = x.replace(",", ".")
-        else:
-            # if only dots and more than one dot -> likely thousands separators, remove them
-            if x.count(".") > 1:
-                x = x.replace(".", "")
-            # if only comma, replace comma with dot
-            if "," in x and "." not in x:
-                x = x.replace(",", ".")
-        # final cleanup: remove any leftover non-digit except dot and minus
-        x = re.sub(r"[^\d\.\-]", "", x)
-        try:
-            return float(x) if x not in ("", ".", "-") else float("nan")
-        except:
-            return float("nan")
-    return s2.map(parse_val)
+    except:
+        pass
+    s = str(x).strip()
+    if s == "" or s.lower() == "nan":
+        return float("nan")
+    # remover símbolos (letras, R$, espaços, etc.), mas manter . e ,
+    s = re.sub(r"[^\d\.,\-]", "", s)
+    # se contém '.' e ',' -> provavelmente formato BR (1.234,56)
+    if "." in s and "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    else:
+        # se contém apenas ',' -> considerar decimal separator
+        if "," in s and "." not in s:
+            s = s.replace(",", ".")
+        # se contém vários '.', remover thousand separators
+        if s.count(".") > 1:
+            s = s.replace(".", "")
+    # limpeza final
+    s = re.sub(r"[^\d\.\-]", "", s)
+    try:
+        return float(s) if s not in ("", ".", "-") else float("nan")
+    except:
+        return float("nan")
 
-def parse_int_series(s):
-    """Transforma série em int, tentando remover texto e separators."""
-    if s is None:
-        return pd.Series(dtype="Int64")
-    s2 = s.astype(str).fillna("")
-    s2 = s2.str.replace(r"[^\d\-\.,]", "", regex=True)
-    # remove thousand separators
-    s2 = s2.str.replace(r"\.", "", regex=True)
-    s2 = s2.str.replace(",", ".", regex=True)
+def parse_money_series(serie):
+    return serie.astype(str).map(lambda x: parse_money_value(x)).astype("float64")
+
+def parse_int_series(serie):
+    # tenta extrair inteiro (remove tudo que não seja dígito)
     def to_int(x):
         try:
-            if x is None or x == "" or x.lower() == "nan":
+            if pd.isna(x):
                 return pd.NA
-            # convert to float then to int if it is integer-valued
-            v = float(x)
-            return int(v)
+        except:
+            pass
+        s = str(x)
+        s = re.sub(r"[^\d\-]", "", s)
+        if s == "" or s == "-" or s.lower() == "nan":
+            return pd.NA
+        try:
+            return int(float(s))
         except:
             return pd.NA
-    return s2.map(to_int).astype("Int64")
+    return serie.map(to_int).astype("Int64")
 
 # --------------------------
-# Carregar arquivo Excel (mantemos seu método)
+# Funções de detecção/limpeza de cabeçalho (mantidas)
 # --------------------------
-def carregar_xls(url):
-    try:
-        xls = pd.ExcelFile(url)
-        return xls, None
-    except Exception as e:
-        return None, str(e)
-
-xls, erro = carregar_xls(URL_PLANILHA)
-if erro:
-    st.error("Erro ao abrir planilha do Google Drive.")
-    st.code(erro)
-    st.stop()
-
-# ignorar aba EXCELENTEJOAO
-abas = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
-
-# =========================
-# Funções de limpeza (usadas anteriormente)
-# =========================
-def detectar_linha_cabecalho(df, chave):
+def detectar_linha_cabecalho(df_raw, chave):
     linha_cab = None
-    for i in range(len(df)):
-        linha = df.iloc[i].astype(str).str.upper().tolist()
+    for i in range(len(df_raw)):
+        linha = df_raw.iloc[i].astype(str).str.upper().tolist()
         if chave in " ".join(linha):
             linha_cab = i
             break
@@ -131,60 +107,27 @@ def limpar_aba_raw(df_raw, nome_aba):
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
-def converter_moedas_e_numeros(dfs_dict):
-    # Estoque
-    if "ESTOQUE" in dfs_dict:
-        df = dfs_dict["ESTOQUE"]
-        if "Media C. UNITARIO" in df.columns:
-            df["Media C. UNITARIO"] = parse_money_series(df["Media C. UNITARIO"])
-        if "Valor Venda Sugerido" in df.columns:
-            df["Valor Venda Sugerido"] = parse_money_series(df["Valor Venda Sugerido"])
-        if "EM ESTOQUE" in df.columns:
-            df["EM ESTOQUE"] = parse_int_series(df["EM ESTOQUE"])
-        if "VENDAS" in df.columns:
-            df["VENDAS"] = parse_int_series(df["VENDAS"])
-        dfs_dict["ESTOQUE"] = df
+# --------------------------
+# Carregar Excel (mantendo seu método)
+# --------------------------
+def carregar_xls(url):
+    try:
+        xls = pd.ExcelFile(url)
+        return xls, None
+    except Exception as e:
+        return None, str(e)
 
-    # Vendas
-    if "VENDAS" in dfs_dict:
-        df = dfs_dict["VENDAS"]
-        if "VALOR VENDA" in df.columns:
-            df["VALOR VENDA"] = parse_money_series(df["VALOR VENDA"])
-        if "VALOR TOTAL" in df.columns:
-            df["VALOR TOTAL"] = parse_money_series(df["VALOR TOTAL"])
-        if "MEDIA CUSTO UNITARIO" in df.columns:
-            df["MEDIA CUSTO UNITARIO"] = parse_money_series(df["MEDIA CUSTO UNITARIO"])
-        if "LUCRO UNITARIO" in df.columns:
-            df["LUCRO UNITARIO"] = parse_money_series(df["LUCRO UNITARIO"])
-        if "QTD" in df.columns:
-            df["QTD"] = parse_int_series(df["QTD"])
-        dfs_dict["VENDAS"] = df
+xls, erro = carregar_xls(URL_PLANILHA)
+if erro:
+    st.error("Erro ao abrir planilha do Google Drive.")
+    st.code(str(erro))
+    st.stop()
 
-    # Compras
-    if "COMPRAS" in dfs_dict:
-        df = dfs_dict["COMPRAS"]
-        # garantir QUANTIDADE numérica
-        if "QUANTIDADE" in df.columns:
-            df["QUANTIDADE"] = parse_int_series(df["QUANTIDADE"])
-        # custo unitário
-        if "CUSTO UNITÁRIO" in df.columns:
-            df["CUSTO UNITÁRIO"] = parse_money_series(df["CUSTO UNITÁRIO"])
-        # recalcular CUSTO TOTAL de forma segura
-        if "QUANTIDADE" in df.columns and "CUSTO UNITÁRIO" in df.columns:
-            df["CUSTO TOTAL (RECALC)"] = (df["QUANTIDADE"].fillna(0).astype(float) *
-                                         df["CUSTO UNITÁRIO"].fillna(0.0))
-        else:
-            # tentar converter coluna existente
-            if "CUSTO TOTAL" in df.columns:
-                df["CUSTO TOTAL (RECALC)"] = parse_money_series(df["CUSTO TOTAL"])
-            else:
-                df["CUSTO TOTAL (RECALC)"] = pd.NA
-        dfs_dict["COMPRAS"] = df
-
-    return dfs_dict
+# ignorar aba EXCELENTEJOAO
+abas = [a for a in xls.sheet_names if a.upper() != "EXCELENTEJOAO"]
 
 # =========================
-# Ler e processar as abas (mantendo seu fluxo)
+# Colunas esperadas (suas)
 # =========================
 colunas_esperadas = {
     "ESTOQUE": [
@@ -202,6 +145,9 @@ colunas_esperadas = {
     ]
 }
 
+# --------------------------
+# Ler e processar abas
+# --------------------------
 dfs = {}
 for aba in colunas_esperadas.keys():
     if aba not in abas:
@@ -210,17 +156,39 @@ for aba in colunas_esperadas.keys():
     limpo = limpar_aba_raw(bruto, aba)
     if limpo is None:
         continue
-    # manter colunas originais e ajustar
     dfs[aba] = limpo
 
-# converter campos monetários/numeros e recalcular custos
-dfs = converter_moedas_e_numeros(dfs)
+# --------------------------
+# Converter valores e recalcular compras com QUANTIDADE * CUSTO UNITÁRIO
+# --------------------------
+# Estoque
+if "ESTOQUE" in dfs:
+    df_e = dfs["ESTOQUE"]
+    if "Media C. UNITARIO" in df_e.columns:
+        df_e["Media C. UNITARIO"] = parse_money_series(df_e["Media C. UNITARIO"])
+    if "Valor Venda Sugerido" in df_e.columns:
+        df_e["Valor Venda Sugerido"] = parse_money_series(df_e["Valor Venda Sugerido"])
+    if "EM ESTOQUE" in df_e.columns:
+        df_e["EM ESTOQUE"] = parse_int_series(df_e["EM ESTOQUE"]).fillna(0)
+    if "VENDAS" in df_e.columns:
+        df_e["VENDAS"] = parse_int_series(df_e["VENDAS"]).fillna(0)
+    dfs["ESTOQUE"] = df_e
 
-# -------------------------------------------------------
-# Criar colunas auxiliares: DATA como datetime, MES_ANO
-# -------------------------------------------------------
+# Vendas
 if "VENDAS" in dfs:
     df_v = dfs["VENDAS"]
+    # convertendo exatamente os nomes que você confirmou
+    if "VALOR VENDA" in df_v.columns:
+        df_v["VALOR VENDA"] = parse_money_series(df_v["VALOR VENDA"])
+    if "VALOR TOTAL" in df_v.columns:
+        df_v["VALOR TOTAL"] = parse_money_series(df_v["VALOR TOTAL"])
+    if "MEDIA CUSTO UNITARIO" in df_v.columns:
+        df_v["MEDIA CUSTO UNITARIO"] = parse_money_series(df_v["MEDIA CUSTO UNITARIO"])
+    if "LUCRO UNITARIO" in df_v.columns:
+        df_v["LUCRO UNITARIO"] = parse_money_series(df_v["LUCRO UNITARIO"])
+    if "QTD" in df_v.columns:
+        df_v["QTD"] = parse_int_series(df_v["QTD"]).fillna(0)
+    # garantir DATA
     if "DATA" in df_v.columns:
         df_v["DATA"] = pd.to_datetime(df_v["DATA"], errors="coerce")
         df_v["MES_ANO"] = df_v["DATA"].dt.strftime("%Y-%m")
@@ -228,8 +196,22 @@ if "VENDAS" in dfs:
         df_v["MES_ANO"] = pd.NA
     dfs["VENDAS"] = df_v
 
+# Compras
 if "COMPRAS" in dfs:
     df_c = dfs["COMPRAS"]
+    if "QUANTIDADE" in df_c.columns:
+        df_c["QUANTIDADE"] = parse_int_series(df_c["QUANTIDADE"]).fillna(0)
+    if "CUSTO UNITÁRIO" in df_c.columns:
+        df_c["CUSTO UNITÁRIO"] = parse_money_series(df_c["CUSTO UNITÁRIO"]).fillna(0.0)
+    # recalcular custo total com segurança
+    if "QUANTIDADE" in df_c.columns and "CUSTO UNITÁRIO" in df_c.columns:
+        df_c["CUSTO TOTAL (RECALC)"] = (df_c["QUANTIDADE"].fillna(0).astype(float) *
+                                         df_c["CUSTO UNITÁRIO"].fillna(0.0))
+    else:
+        if "CUSTO TOTAL" in df_c.columns:
+            df_c["CUSTO TOTAL (RECALC)"] = parse_money_series(df_c["CUSTO TOTAL"]).fillna(0.0)
+        else:
+            df_c["CUSTO TOTAL (RECALC)"] = 0.0
     if "DATA" in df_c.columns:
         df_c["DATA"] = pd.to_datetime(df_c["DATA"], errors="coerce")
         df_c["MES_ANO"] = df_c["DATA"].dt.strftime("%Y-%m")
@@ -238,132 +220,115 @@ if "COMPRAS" in dfs:
     dfs["COMPRAS"] = df_c
 
 # --------------------------
-# FILTRO POR MÊS (único control)
+# FILTRO POR MÊS (YYYY-MM)
 # --------------------------
-# lista de meses válidos da aba vendas (se houver), ordenados desc
-meses_disponiveis = []
+meses_venda = []
 if "VENDAS" in dfs:
-    meses_disponiveis = sorted(df_v["MES_ANO"].dropna().unique().tolist(), reverse=True)
-# incluir uma opção "Todos"
-meses_opcoes = ["Todos"] + meses_disponiveis
-mes_selecionado = st.selectbox("Filtrar por mês (ano-mês):", meses_opcoes, index=0)
+    meses_venda = sorted(dfs["VENDAS"]["MES_ANO"].dropna().unique().tolist(), reverse=True)
+meses = ["Todos"] + meses_venda
+mes_selecionado = st.selectbox("Filtrar por mês (YYYY-MM):", meses, index=0)
 
-def filtrar_por_mes(df, mes):
-    if mes is None or mes == "Todos":
+def filtrar_mes(df, mes):
+    if mes == "Todos" or mes is None:
         return df
     if "MES_ANO" in df.columns:
         return df[df["MES_ANO"] == mes].copy()
     return df
 
-vendas_filtradas = filtrar_por_mes(dfs.get("VENDAS", pd.DataFrame()), mes_selecionado)
-compras_filtradas = filtrar_por_mes(dfs.get("COMPRAS", pd.DataFrame()), mes_selecionado)
+vendas_filtradas = filtrar_mes(dfs.get("VENDAS", pd.DataFrame()), mes_selecionado)
+compras_filtradas = filtrar_mes(dfs.get("COMPRAS", pd.DataFrame()), mes_selecionado)
 estoque_df = dfs.get("ESTOQUE", pd.DataFrame())
 
 # --------------------------
-# KPIs: total vendido (R$) e total lucro (R$) no período
+# KPIs: total vendido e total lucro (R$) no período
 # --------------------------
 def calcular_totais_vendas(df):
     if df is None or df.empty:
         return 0.0, 0.0
-    # total vendido em R$
-    total_vendido = 0.0
+    tv = 0.0
+    tl = 0.0
     if "VALOR TOTAL" in df.columns:
-        total_vendido = df["VALOR TOTAL"].fillna(0.0).sum()
+        tv = df["VALOR TOTAL"].fillna(0.0).sum()
     elif "VALOR VENDA" in df.columns and "QTD" in df.columns:
-        total_vendido = (df["VALOR VENDA"].fillna(0.0) * df["QTD"].fillna(0)).sum()
-
-    # total lucro
-    lucro_total = 0.0
+        tv = (df["VALOR VENDA"].fillna(0.0) * df["QTD"].fillna(0)).sum()
+    # lucro
     if "LUCRO UNITARIO" in df.columns and "QTD" in df.columns:
-        lucro_total = (df["LUCRO UNITARIO"].fillna(0.0) * df["QTD"].fillna(0)).sum()
+        tl = (df["LUCRO UNITARIO"].fillna(0.0) * df["QTD"].fillna(0)).sum()
     elif "LUCRO UNITARIO" in df.columns:
-        lucro_total = df["LUCRO UNITARIO"].fillna(0.0).sum()
+        tl = df["LUCRO UNITARIO"].fillna(0.0).sum()
     else:
-        # fallback: VALOR_TOTAL - CUSTO aproximado
+        # tentativa por diferença com custo médio
         if "VALOR TOTAL" in df.columns and "MEDIA CUSTO UNITARIO" in df.columns and "QTD" in df.columns:
             custo_estim = (df["MEDIA CUSTO UNITARIO"].fillna(0.0) * df["QTD"].fillna(0)).sum()
-            lucro_total = df["VALOR TOTAL"].sum() - custo_estim
-
-    return float(total_vendido), float(lucro_total)
+            tl = df["VALOR TOTAL"].sum() - custo_estim
+    return float(tv), float(tl)
 
 total_vendido, total_lucro = calcular_totais_vendas(vendas_filtradas)
 
-# total gasto em compras (usar coluna recalc)
+# total compras recalcadas (filtradas)
 total_compras = 0.0
 if not compras_filtradas.empty and "CUSTO TOTAL (RECALC)" in compras_filtradas.columns:
     total_compras = compras_filtradas["CUSTO TOTAL (RECALC)"].fillna(0.0).sum()
-elif not compras_filtradas.empty and "CUSTO TOTAL" in compras_filtradas.columns:
-    total_compras = parse_money_series(compras_filtradas["CUSTO TOTAL"]).fillna(0.0).sum()
 
-# Exibir KPIs no topo
 k1, k2, k3 = st.columns(3)
 k1.metric("💵 Total Vendido (R$)", f"R$ {total_vendido:,.2f}")
 k2.metric("🧾 Total Lucro (R$)", f"R$ {total_lucro:,.2f}")
-k3.metric("🧾 Total Compras (R$)", f"R$ {total_compras:,.2f}")
+k3.metric("💸 Total Compras (R$)", f"R$ {total_compras:,.2f}")
 
 # --------------------------
-# Top 10 Produtos Mais Vendidos (por VALOR TOTAL)
+# Top 10 produtos por VALOR TOTAL
 # --------------------------
-st.subheader("🏆 Top 10 Produtos Mais Vendidos (por Valor)")
+st.subheader("🏆 Top 10 Produtos Mais Vendidos (por VALOR)")
+
 if vendas_filtradas is None or vendas_filtradas.empty:
     st.info("Sem dados de vendas para o período selecionado.")
 else:
-    # garantir colunas
     dfv = vendas_filtradas.copy()
+    # criar VALOR TOTAL se não existir
     if "VALOR TOTAL" not in dfv.columns and "VALOR VENDA" in dfv.columns and "QTD" in dfv.columns:
         dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0.0) * dfv["QTD"].fillna(0)
 
-    # agrupar por produto
-    if "PRODUTO" in dfv.columns:
-        top = (dfv.groupby("PRODUTO")["VALOR TOTAL"]
-               .sum()
-               .reset_index()
-               .sort_values("VALOR TOTAL", ascending=False)
-               .head(10))
-        fig_top = px.bar(top, x="PRODUTO", y="VALOR TOTAL", title="Top 10 - Vendas (R$)")
+    if "PRODUTO" in dfv.columns and "VALOR TOTAL" in dfv.columns:
+        top10 = (dfv.groupby("PRODUTO")
+                 .agg(QTD_TOTAL=pd.NamedAgg(column="QTD", aggfunc="sum"),
+                      VALOR_TOTAL=pd.NamedAgg(column="VALOR TOTAL", aggfunc="sum"),
+                      LUCRO_TOTAL=pd.NamedAgg(column="LUCRO UNITARIO", aggfunc=lambda s: (s.fillna(0.0) * dfv.loc[s.index, "QTD"].fillna(0)).sum() if "LUCRO UNITARIO" in dfv.columns else 0.0)
+                      )
+                 .reset_index()
+                 .sort_values("VALOR_TOTAL", ascending=False)
+                 .head(10))
+        # formatar
+        top10["VALOR_TOTAL"] = top10["VALOR_TOTAL"].fillna(0.0)
+        top10["LUCRO_TOTAL"] = top10["LUCRO_TOTAL"].fillna(0.0)
+        top10["QTD_TOTAL"] = top10["QTD_TOTAL"].fillna(0).astype("Int64")
+        st.dataframe(top10.style.format({"VALOR_TOTAL": "R$ {:,.2f}", "LUCRO_TOTAL": "R$ {:,.2f}", "QTD_TOTAL": "{:,.0f}"}), use_container_width=True)
+        fig_top = px.bar(top10, x="PRODUTO", y="VALOR_TOTAL", title="Top 10 - Vendas (R$)")
         st.plotly_chart(fig_top, use_container_width=True)
-
-        # tabela com Qtd vendida e lucro por produto (apoiando detalhes)
-        detalhes = (dfv.groupby("PRODUTO")
-                    .agg(QTD_TOTAL=pd.NamedAgg(column="QTD", aggfunc="sum"),
-                         VALOR_TOTAL=pd.NamedAgg(column="VALOR TOTAL", aggfunc="sum"),
-                         LUCRO_TOTAL=pd.NamedAgg(column="LUCRO_UNITARIO" if "LUCRO_UNITARIO" in dfv.columns else "VALOR_TOTAL",
-                                                 aggfunc=lambda x: (x.fillna(0) * dfv.loc[x.index, "QTD"].fillna(0)).sum()
-                                                 if "LUCRO_UNITARIO" in dfv.columns and "QTD" in dfv.columns else x.sum())))
-        detalhes = detalhes.reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
-        # ajustar nomes das colunas e exibir
-        if "LUCRO_TOTAL" in detalhes.columns:
-            detalhes["LUCRO_TOTAL"] = detalhes["LUCRO_TOTAL"].fillna(0.0)
-        st.dataframe(detalhes.style.format({"VALOR_TOTAL": "R$ {:,.2f}", "LUCRO_TOTAL": "R$ {:,.2f}", "QTD_TOTAL": "{:,.0f}"}))
     else:
-        st.warning("Coluna 'PRODUTO' não encontrada nas vendas.")
+        st.warning("Colunas necessárias (PRODUTO, VALOR TOTAL) não encontradas em VENDAS.")
 
 # --------------------------
-# Gráficos adicionais por aba (opcionais)
+# Evolução do faturamento (diária) — gráfico
 # --------------------------
 st.subheader("📈 Evolução do Faturamento (período selecionado)")
 if not vendas_filtradas.empty and "DATA" in vendas_filtradas.columns and "VALOR TOTAL" in vendas_filtradas.columns:
-    series_fat = (vendas_filtradas.groupby("DATA")["VALOR TOTAL"].sum().reset_index().sort_values("DATA"))
+    series_fat = vendas_filtradas.groupby("DATA")["VALOR TOTAL"].sum().reset_index().sort_values("DATA")
     fig_fat = px.line(series_fat, x="DATA", y="VALOR TOTAL", title="Faturamento Diário")
     st.plotly_chart(fig_fat, use_container_width=True)
 else:
     st.info("Sem dados de faturamento por data para exibir.")
 
 # --------------------------
-# Compras: corrigir valores e mostrar série
+# Compras — mostrar recalc e série
 # --------------------------
 st.subheader("📥 Compras (período selecionado)")
 if not compras_filtradas.empty:
     dfc = compras_filtradas.copy()
-    # exibir coluna recalcada e limpar valores extremos
     if "CUSTO TOTAL (RECALC)" in dfc.columns:
-        dfc["CUSTO TOTAL (RECALC)"] = pd.to_numeric(dfc["CUSTO TOTAL (RECALC)"], errors="coerce").fillna(0.0)
-        # limitar valores absurdos: se > 1e12 consideramos inválido -> NaN
+        # remover valores absurdos (defensivo)
+        dfc["CUSTO TOTAL (RECALC)"] = pd.to_numeric(dfc["CUSTO TOTAL (RECALC)"], errors="coerce")
         dfc.loc[dfc["CUSTO TOTAL (RECALC)"] > 1e12, "CUSTO TOTAL (RECALC)"] = pd.NA
-
         st.metric("Total Compras (recalculado)", f"R$ {dfc['CUSTO TOTAL (RECALC)'].sum():,.2f}")
-
-        # série de compras
         if "DATA" in dfc.columns:
             serie_comp = dfc.groupby("DATA")["CUSTO TOTAL (RECALC)"].sum().reset_index().sort_values("DATA")
             fig_comp = px.line(serie_comp, x="DATA", y="CUSTO TOTAL (RECALC)", title="Gastos com Compras")
@@ -380,11 +345,9 @@ else:
 st.subheader("📦 Estoque")
 if not estoque_df.empty:
     df_e = estoque_df.copy()
-    # garantir EM ESTOQUE numérico
     if "EM ESTOQUE" in df_e.columns:
         df_e["EM ESTOQUE"] = parse_int_series(df_e["EM ESTOQUE"]).fillna(0)
-    # exibir top com menor estoque
-    if "EM ESTOQUE" in df_e.columns and "PRODUTO" in df_e.columns:
+    if "PRODUTO" in df_e.columns and "EM ESTOQUE" in df_e.columns:
         criticos = df_e.sort_values("EM ESTOQUE").head(10)
         st.write("Produtos com menor estoque")
         st.dataframe(criticos[["PRODUTO", "EM ESTOQUE"]], use_container_width=True)
