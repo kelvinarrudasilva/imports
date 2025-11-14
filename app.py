@@ -16,18 +16,21 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # VISUAL
 # ----------------------------
 st.markdown("""
-    <style>
-      :root { --accent:#1aa3ff; --accent-dark:#0066cc; }
-      body, .stApp { background-color:#ffffff; color:#111; }
-      h1,h2,h3,h4 { color: var(--accent-dark); }
-      .stDataFrame thead th { background-color:#f0f8ff;}
-      .kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
-      .kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
-      .kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
-      .stTabs button { background-color: #e0e0e0; border-radius:5px; }
-    </style>
+<style>
+:root { --accent:#1aa3ff; --accent-dark:#0066cc; }
+body, .stApp { background-color:#ffffff; color:#111; }
+h1,h2,h3,h4 { color: var(--accent-dark); }
+
+.stDataFrame thead th { background-color:#f0f8ff;}
+
+.kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
+.kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
+.kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
+
+.stTabs button { background-color:#e0e0e0 !important; border-radius:8px; margin-right:4px; }
+</style>
 """, unsafe_allow_html=True)
 
 st.title("📊 Loja Importados — Dashboard")
@@ -85,6 +88,7 @@ def formatar_valor_reais(df, colunas):
     return df
 
 def formatar_reais(valor):
+    """Formata float em reais: R$ 1.299,00"""
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # ----------------------------
@@ -203,7 +207,7 @@ compras_filtradas = ordenar_data(filtrar_mes(dfs.get("COMPRAS", pd.DataFrame()),
 estoque_df = dfs.get("ESTOQUE", pd.DataFrame())
 
 # ----------------------------
-# KPIs COM FUNDO COLORIDO
+# KPIs
 # ----------------------------
 total_vendido = (vendas_filtradas["VALOR TOTAL"].fillna(0) if "VALOR TOTAL" in vendas_filtradas.columns else vendas_filtradas["VALOR VENDA"].fillna(0)*vendas_filtradas["QTD"].fillna(0)).sum()
 total_lucro = (vendas_filtradas["LUCRO UNITARIO"].fillna(0)*vendas_filtradas["QTD"].fillna(0)).sum() if "LUCRO UNITARIO" in vendas_filtradas.columns else 0
@@ -219,6 +223,7 @@ k3.markdown(f'<div class="kpi-compras"><h3>💸 Total Compras</h3><span>{formata
 # ----------------------------
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QUANTIDADE)","💰 TOP10 LUCRO","📦 CONSULTAR ESTOQUE","🔍 PESQUISAR PRODUTO"])
 
+# Função preparar tabela vendas
 def preparar_tabela_vendas(df):
     df_show = df.dropna(axis=1, how='all')
     if "DATA" in df_show.columns:
@@ -247,17 +252,17 @@ with tabs[1]:
             VALOR_TOTAL=("VALOR TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
+        top_val["VALOR_TOTAL_FORMAT"] = top_val["VALOR_TOTAL"].apply(lambda x: formatar_reais(x))
         fig = px.bar(
             top_val,
             x="PRODUTO",
             y="VALOR_TOTAL",
-            text="VALOR_TOTAL",
-            hover_data={"QTD_TOTAL": True, "VALOR_TOTAL":":.2f"}
+            text="VALOR_TOTAL_FORMAT",
+            hover_data={"QTD_TOTAL": True, "VALOR_TOTAL_FORMAT": True}
         )
-        fig.update_traces(texttemplate='%{text:.2f}', textposition="inside")
-        fig.update_yaxes(tickprefix="R$ ", tickformat=", .2f")
+        fig.update_traces(textposition="inside")
         st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(formatar_valor_reais(top_val, ["VALOR_TOTAL"]), use_container_width=True)
+        st.dataframe(top_val.drop(columns=["VALOR_TOTAL_FORMAT"]), use_container_width=True)
     else:
         st.info("Sem dados de vendas para o período selecionado.")
 
@@ -288,17 +293,17 @@ with tabs[3]:
             LUCRO_TOTAL=("LUCRO_TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("LUCRO_TOTAL", ascending=False).head(10)
+        top_lucro["LUCRO_TOTAL_FORMAT"] = top_lucro["LUCRO_TOTAL"].apply(lambda x: formatar_reais(x))
         fig3 = px.bar(
             top_lucro,
             x="PRODUTO",
             y="LUCRO_TOTAL",
-            text="LUCRO_TOTAL",
-            hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL":":.2f"}
+            text="LUCRO_TOTAL_FORMAT",
+            hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL_FORMAT": True}
         )
-        fig3.update_traces(texttemplate='%{text:.2f}', textposition="inside")
-        fig3.update_yaxes(tickprefix="R$ ", tickformat=", .2f")
+        fig3.update_traces(textposition="inside")
         st.plotly_chart(fig3, use_container_width=True)
-        st.dataframe(formatar_valor_reais(top_lucro, ["LUCRO_TOTAL"]), use_container_width=True)
+        st.dataframe(top_lucro.drop(columns=["LUCRO_TOTAL_FORMAT"]), use_container_width=True)
     else:
         st.info("Sem dados de vendas para o período selecionado.")
 
@@ -319,10 +324,11 @@ with tabs[4]:
 # ----------------------------
 # Aba PESQUISAR PRODUTO
 with tabs[5]:
-    st.subheader("Pesquisar Produto no Estoque")
-    produto_input = st.text_input("Digite o nome do produto:")
-    if produto_input:
-        df_search = estoque_df[estoque_df["PRODUTO"].str.contains(produto_input, case=False, na=False)]
+    st.subheader("Pesquisar produto no Estoque")
+    search_term = st.text_input("Digite o nome do produto:")
+    if search_term:
+        df_search = estoque_df.copy()
+        df_search = df_search[df_search["PRODUTO"].str.contains(search_term, case=False, na=False)]
         if not df_search.empty:
             df_search = formatar_valor_reais(df_search, ["Media C. UNITARIO","Valor Venda Sugerido"])
             st.dataframe(df_search.reset_index(drop=True), use_container_width=True)
