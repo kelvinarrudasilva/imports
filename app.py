@@ -98,9 +98,11 @@ def corrigir_colunas(df, esperadas):
 # =============================================================================
 st.title("📊 Dashboard Geral – Gestão Loja Importados")
 
-link = st.text_input("👉 Cole o link do Google Sheets (tabela principal)")
+# Link fixo da planilha Google Drive
+URL_PLANILHA = "https://drive.google.com/uc?export=download&id=1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b"
 
-if not link:
+df = carregar_planilha(URL_PLANILHA)
+if df is None:
     st.stop()
 
 df = carregar_planilha(link)
