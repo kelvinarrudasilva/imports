@@ -138,9 +138,6 @@ v_val_unit = find_col(vendas, "VALOR VENDA", "VALOR_VENDA", "PRECO")
 v_val_total = find_col(vendas, "VALOR TOTAL", "VALOR_TOTAL", "TOTAL")
 v_lucro = find_col(vendas, "LUCRO")
 
-c_custo_unit = find_col(compras, "CUSTO UNITÁRIO", "CUSTO UNIT", "CUSTO_UNIT")
-c_custo_total = find_col(compras, "CUSTO TOTAL", "VALOR TOTAL", "TOTAL")
-
 # ======================
 # Prepare numeric columns
 # ======================
@@ -222,10 +219,10 @@ with tab1:
 
     st.markdown("---")
 
-    # Evolução de vendas
-    st.subheader("📊 Evolução de Vendas por Mês")
-    if not vendas.empty:
-        evo = vendas.groupby("_PERIODO").agg(Total_Venda=("_VAL_TOTAL","sum")).reset_index()
+    # Evolução de vendas (somente período selecionado)
+    st.subheader("📊 Evolução de Vendas")
+    if not vendas_period.empty:
+        evo = vendas_period.groupby("_PERIODO").agg(Total_Venda=("_VAL_TOTAL","sum")).reset_index()
         evo["PERIODO_FMT"] = pd.to_datetime(evo["_PERIODO"] + "-01").dt.strftime("%b %Y")
         evo_fig = px.line(evo, x="PERIODO_FMT", y="Total_Venda", markers=True)
         evo_fig.update_layout(plot_bgcolor="#000000", paper_bgcolor="#000000", font_color="#FFD700",
@@ -235,7 +232,7 @@ with tab1:
 
     st.markdown("---")
 
-    # Top10 produtos
+    # Top10 produtos (somente período selecionado)
     st.subheader("🏆 Top 10 — Produtos Mais Vendidos")
     if not vendas_period.empty and v_prod in vendas_period.columns:
         grp = vendas_period.groupby(v_prod).agg(QTDE_SOMADA=("_QTD", "sum"), VAL_TOTAL=("_VAL_TOTAL","sum")).reset_index()
