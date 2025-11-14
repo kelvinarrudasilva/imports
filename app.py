@@ -220,34 +220,10 @@ def preparar_tabela_vendas(df):
 # Aba VENDAS
 with tabs[0]:
     st.subheader("Vendas (período selecionado)")
-
-    if not vendas_filtradas.empty:
-
-        # --- GRÁFICO MENSAL NO TOPO ---
-        vendas_mensal = vendas_filtradas.groupby("MES_ANO").agg(
-            TOTAL_VENDIDO=("VALOR TOTAL", "sum"),
-            TOTAL_LUCRO=("LUCRO UNITARIO", lambda x: (x * vendas_filtradas.loc[x.index, "QTD"]).sum())
-        ).reset_index()
-        vendas_mensal["LABEL"] = vendas_mensal["TOTAL_VENDIDO"].map(lambda x: f"R$ {x:,.2f}")
-        vendas_mensal["TOTAL_LUCRO_STR"] = vendas_mensal["TOTAL_LUCRO"].map(lambda x: f"R$ {x:,.2f}")
-
-        fig_mes = px.bar(
-            vendas_mensal,
-            x="MES_ANO",
-            y="TOTAL_VENDIDO",
-            text="LABEL",
-            hover_data={"TOTAL_LUCRO_STR": True},
-            labels={"MES_ANO": "Mês", "TOTAL_VENDIDO": "Total Vendido (R$)"},
-            title="📊 Vendas Mensais — Valor Vendido e Lucro"
-        )
-        fig_mes.update_traces(textposition="inside", marker_color="#FFD700")
-        fig_mes.update_layout(xaxis_title="", yaxis_title="", uniformtext_minsize=8)
-        st.plotly_chart(fig_mes, use_container_width=True)
-
-        # --- TABELA ---
-        st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
-    else:
+    if vendas_filtradas.empty:
         st.info("Sem dados de vendas para o período selecionado.")
+    else:
+        st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
 
 # ----------------------------
 # Aba TOP10 VALOR
@@ -301,15 +277,14 @@ with tabs[3]:
             LUCRO_TOTAL=("LUCRO_TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("LUCRO_TOTAL", ascending=False).head(10)
-        top_lucro["LUCRO_LABEL"] = top_lucro["LUCRO_TOTAL"].map(lambda x: f"R$ {x:,.2f}")
         fig3 = px.bar(
             top_lucro,
             x="PRODUTO",
             y="LUCRO_TOTAL",
-            text="LUCRO_LABEL",
+            text="LUCRO_TOTAL",
             hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL":":.2f"}
         )
-        fig3.update_traces(textposition="inside", marker_color="#0e8c4a")
+        fig3.update_traces(textposition="inside")
         st.plotly_chart(fig3, use_container_width=True)
         st.dataframe(formatar_valor_reais(top_lucro, ["LUCRO_TOTAL"]), use_container_width=True)
     else:
