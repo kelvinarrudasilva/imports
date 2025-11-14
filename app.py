@@ -9,23 +9,7 @@ from io import BytesIO
 
 # ======================
 # Config visual (Alto contraste: Preto + Dourado)
-# ======================
-st.set_page_config(page_title="Painel - Loja Importados", layout="wide")
-
-st.markdown(
-    """
-    <style>
-      :root { --gold:#FFD700; --bg:#000000; --card:#0f0f0f; --muted:#bbbbbb; --white:#FFFFFF; }
-      .stApp { background-color: var(--bg); color: var(--gold); }
-      .title { color: var(--gold); font-weight:700; font-size:22px; }
-      .subtitle { color: var(--muted); font-size:12px; margin-bottom:12px; }
-      .kpi { background: linear-gradient(90deg, #111111, #0b0b0b); padding:12px; border-radius:10px; text-align:center; }
-      .kpi-value { color: var(--gold); font-size:22px; font-weight:700; }
-      .kpi-label { color:var(--muted); font-size:13px; }
-      .stDataFrame table { background-color:#050505; color:var(--white); }
-      .small { color: var(--muted); font-size:12px; }
-      .table-card { background: linear-gradient(90deg,#0b0b0b,#111111); border: 1px solid rgba(255,215,0,0.08); padding:12px; border-radius:10px; }
-      .table-card h4 { color: var(--gold); margin:0 0 8px 0; }
+# =Aargin:0 0 8px 0; }
       .table-card .big { font-size:15px; color:var(--white); }
       .small-select .stSelectbox>div>div { font-size:14px; }
       .summary-table .dataframe td, .summary-table .dataframe th { font-size:13px !important; }
@@ -257,3 +241,4 @@ with tab2:
         st.dataframe(est[["PRODUTO","QTD","PRECO VENDA","PRECO CUSTO"]].reset_index(drop=True))
     else:
         st.info("Estoque vazio ou coluna de produto não encontrada.")
+
