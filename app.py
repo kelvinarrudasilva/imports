@@ -134,6 +134,17 @@ def preparar_tabela_vendas(df):
     d=d.loc[:,~d.columns.astype(str).str.contains("^Unnamed|MES_ANO")]
     return d
 
+def plotly_dark_config(fig):
+    fig.update_layout(
+        plot_bgcolor="#111",
+        paper_bgcolor="#111",
+        font_color="#f0f0f0",
+        xaxis=dict(color="#f0f0f0",gridcolor="#333"),
+        yaxis=dict(color="#f0f0f0",gridcolor="#333"),
+        margin=dict(t=30,b=30,l=10,r=10)
+    )
+    return fig
+
 # =============================
 # Carregar planilha
 # =============================
@@ -224,7 +235,6 @@ with col_kpis:
 # TABS
 # =============================
 tabs=st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QTD)","📦 ESTOQUE","🔍 PESQUISAR"])
-
 # =============================
 # VENDAS
 # =============================
@@ -245,8 +255,8 @@ with tabs[0]:
         df_sem_group["LABEL"]=df_sem_group["VALOR TOTAL"].apply(formatar_reais_sem_centavos)
         st.markdown("### 📊 Faturamento Semanal do Mês")
         fig_sem=px.bar(df_sem_group,x="INTERVALO",y="VALOR TOTAL",text="LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
+        plotly_dark_config(fig_sem)
         fig_sem.update_traces(textposition="inside",textfont_size=14)
-        fig_sem.update_layout(margin=dict(t=30,b=30,l=10,r=10),xaxis_title="Semana",yaxis_title="Faturamento (R$)")
         st.plotly_chart(fig_sem,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela de Vendas")
         st.dataframe(preparar_tabela_vendas(vendas_filtradas),use_container_width=True)
@@ -262,6 +272,7 @@ with tabs[1]:
         top_val=dfv.groupby("PRODUTO",dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"),QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL",ascending=False).head(10)
         top_val["VALOR_TOTAL_LABEL"]=top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig_top_val=px.bar(top_val,x="PRODUTO",y="VALOR_TOTAL",text="VALOR_TOTAL_LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
+        plotly_dark_config(fig_top_val)
         fig_top_val.update_traces(textposition="inside",textfont_size=14)
         st.plotly_chart(fig_top_val,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por VALOR")
@@ -278,6 +289,7 @@ with tabs[2]:
         top_qtd=dfv.groupby("PRODUTO",dropna=False).agg(QTD_TOTAL=("QTD","sum"),VALOR_TOTAL=("VALOR TOTAL","sum")).reset_index().sort_values("QTD_TOTAL",ascending=False).head(10)
         top_qtd["QTD_TOTAL_LABEL"]=top_qtd["QTD_TOTAL"].astype(str)
         fig_top_qtd=px.bar(top_qtd,x="PRODUTO",y="QTD_TOTAL",text="QTD_TOTAL_LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
+        plotly_dark_config(fig_top_qtd)
         fig_top_qtd.update_traces(textposition="inside",textfont_size=14)
         st.plotly_chart(fig_top_qtd,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por QUANTIDADE")
@@ -302,3 +314,4 @@ with tabs[4]:
         df_search=estoque_df[estoque_df["PRODUTO"].str.contains(termo,case=False,na=False)]
         if df_search.empty: st.warning("Nenhum produto encontrado.")
         else: st.dataframe(df_search,use_container_width=True)
+
