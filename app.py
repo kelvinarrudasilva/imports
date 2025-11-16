@@ -1,4 +1,4 @@
-# app.py — Loja Importados (roxo moderno) — CORRIGIDO (tratamento seguro de % e demais colunas)
+# app.py — Loja Importados (roxo moderno) — COMPLETO (parser % robusto com 2 casas decimais)
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -283,10 +283,19 @@ def preparar_tabela_vendas(df):
             df_show[col] = 0
     # formatar monetários
     df_show = formatar_colunas_moeda(df_show, ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
-    # formatar % de lucro com conversão segura
+    # formatar % de lucro com conversão segura (remove emojis, % e espaços)
     if "% DE LUCRO SOBRE CUSTO" in df_show.columns:
-        # converte para numérico (coerce erros), preenche 0 e formata
-        pct = pd.to_numeric(df_show["% DE LUCRO SOBRE CUSTO"], errors="coerce").fillna(0)
+        # converte tudo para string e remove caracteres que não sejam dígito, vírgula, ponto ou sinal
+        col = (
+            df_show["% DE LUCRO SOBRE CUSTO"]
+            .astype(str)
+            .str.replace(r"[^0-9,.\-]", "", regex=True)
+            .str.replace(",", ".", regex=False)
+            .str.strip()
+        )
+        # converte para número de verdade (porcentagem já em escala 100, ex: "294" -> 294)
+        pct = pd.to_numeric(col, errors="coerce").fillna(0)
+        # formatar com duas casas e símbolo %
         df_show["% DE LUCRO SOBRE CUSTO"] = pct.map(lambda x: f"{float(x):.2f}%")
     return df_show
 
@@ -305,7 +314,7 @@ with tabs[1]:
     else:
         dfv = vendas_filtradas.copy()
         if "VALOR TOTAL" not in dfv.columns and "VALOR VENDA" in dfv.columns:
-            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0) * dfv.get("QTD",0).fillna(0)
+            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0) * dfv.get("QTD", 0).fillna(0)
         top_val = dfv.groupby("PRODUTO", dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"), QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
         top_val["VALOR_TOTAL_LABEL"] = top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig = px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL", text="VALOR_TOTAL_LABEL", hover_data=["QTD_TOTAL"], color_discrete_sequence=["#8b5cf6"])
