@@ -1,5 +1,3 @@
-a
-
 # app.py — Dashboard Loja Importados (Roxo Minimalista)
 # ----------------------------------------------------
 import streamlit as st
