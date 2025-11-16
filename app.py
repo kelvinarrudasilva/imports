@@ -322,4 +322,45 @@ with tabs[0]:
         )
         st.plotly_chart(fig_sem, use_container_width=True)
         st.markdown("### 📄 Tabela de Vendas")
-        st.dataframe(preparar_tabela_vendas(vendas_filtradas),
+        st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
+
+# -------------------- TOP10 VALOR --------------------
+with tabs[1]:
+    st.subheader("Top 10 Produtos — Valor")
+    if vendas_filtradas.empty:
+        st.info("Sem dados.")
+    else:
+        df_top_val = vendas_filtradas.groupby("PRODUTO")["VALOR TOTAL"].sum().reset_index().sort_values("VALOR TOTAL", ascending=False).head(10)
+        df_top_val = formatar_colunas_moeda(df_top_val, ["VALOR TOTAL"])
+        st.dataframe(df_top_val, use_container_width=True)
+
+# -------------------- TOP10 QTD --------------------
+with tabs[2]:
+    st.subheader("Top 10 Produtos — Quantidade")
+    if vendas_filtradas.empty:
+        st.info("Sem dados.")
+    else:
+        df_top_qtd = vendas_filtradas.groupby("PRODUTO")["QTD"].sum().reset_index().sort_values("QTD", ascending=False).head(10)
+        st.dataframe(df_top_qtd, use_container_width=True)
+
+# -------------------- ESTOQUE --------------------
+with tabs[3]:
+    st.subheader("Estoque Atual")
+    if estoque_df.empty:
+        st.info("Sem dados.")
+    else:
+        st.dataframe(formatar_colunas_moeda(estoque_df, ["Media C. UNITARIO","Valor Venda Sugerido"]), use_container_width=True)
+
+# -------------------- PESQUISAR --------------------
+with tabs[4]:
+    st.subheader("🔍 Pesquisa de Produtos")
+    if estoque_df.empty:
+        st.info("Sem dados.")
+    else:
+        produto_filtro = st.text_input("Digite o produto ou parte do nome:")
+        df_search = estoque_df.copy()
+        if produto_filtro.strip():
+            df_search = df_search[df_search["PRODUTO"].str.contains(produto_filtro, case=False, na=False)]
+        st.dataframe(formatar_colunas_moeda(df_search, ["Media C. UNITARIO","Valor Venda Sugerido"]), use_container_width=True)
+
+st.success("✅ Dashboard carregado com sucesso!")
