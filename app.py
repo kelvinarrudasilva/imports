@@ -1,13 +1,5 @@
 # app.py — Dashboard Loja Importados — Minimalista Roxo
 # ---------------------------------------------------------
-# Melhorias:
-# - Abas não sobrepõem KPIs
-# - Gráfico semanal mais claro (com data inicial/final da semana)
-# - Labels dentro das barras, maiores e limpos
-# - Gráficos também no TOP10 Valor, TOP10 Qtd e ESTOQUE
-# - Seleção de mês pré-seleciona o mês atual
-# - Tabela limpa (sem MES_ANO e sem índice inicial estranho)
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -18,9 +10,6 @@ from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-# ----------------------------
-# Config / Link fixo
-# ----------------------------
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
@@ -210,8 +199,7 @@ if "COMPRAS" in dfs:
     qcols = [c for c in df_c.columns if "QUANT" in c.upper()]
     if qcols: df_c["QUANTIDADE"]=parse_int_series(df_c[qcols[0]]).fillna(0)
     ccols = [c for c in df_c.columns if any(k in c.upper() for k in ("CUSTO","UNIT"))]
-    if ccols: df_c["CUSTO UNITÁRIO"]=parse_money_series(df_c[ccols[0]]).fillna(0)
-    df_c["CUSTO TOTAL (RECALC)"]=df_c.get("QUANTIDADE",0)*df_c.get("CUSTO UNITÁRIO",0)
+    if ccols: df_c["CUSTO TOTAL (RECALC)"]=parse_money_series(df_c[ccols[0]]).fillna(0)*df_c.get("QUANTIDADE",0)
     if "DATA" in df_c.columns: 
         df_c["DATA"]=pd.to_datetime(df_c["DATA"], errors="coerce")
         df_c["MES_ANO"]=df_c["DATA"].dt.strftime("%Y-%m")
@@ -292,8 +280,10 @@ with tabs[1]:
         st.info("Sem dados.")
     else:
         dfv=vendas_filtradas.copy()
-        if "VALOR TOTAL" not in dfv and "VALOR VENDA" in dfv: dfv["VALOR TOTAL"]=dfv["VALOR VENDA"].fillna(0)*dfv.get("QTD",0).fillna(0)
-        top_val=dfv.groupby("PRODUTO", dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"), QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
+        top_val=dfv.groupby("PRODUTO", dropna=False).agg(
+            VALOR_TOTAL=("VALOR TOTAL","sum"),
+            QTD_TOTAL=("QTD","sum")
+        ).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
         top_val["LABEL"]=top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig_val=px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL", text="LABEL", color_discrete_sequence=["#8b5cf6"])
         fig_val.update_traces(textposition="inside", textfont_size=14)
@@ -309,7 +299,10 @@ with tabs[2]:
         st.info("Sem dados.")
     else:
         dfq=vendas_filtradas.copy()
-        top_qtd=dfq.groupby("PRODUTO", dropna=False).agg(QTD_TOTAL=("QTD","sum"), VALOR_TOTAL=("VALOR TOTAL","sum")).reset_index().sort_values("QTD_TOTAL", ascending=False).head(10)
+        top_qtd=dfq.groupby("PRODUTO", dropna=False).agg(
+            QTD_TOTAL=("QTD","sum"),
+            VALOR_TOTAL=("VALOR TOTAL","sum")
+        ).reset_index().sort_values("QTD_TOTAL", ascending=False).head(10)
         top_qtd["LABEL"]=top_qtd["QTD_TOTAL"].astype(str)
         fig_qtd=px.bar(top_qtd, x="PRODUTO", y="QTD_TOTAL", text="LABEL", color_discrete_sequence=["#8b5cf6"])
         fig_qtd.update_traces(textposition="inside", textfont_size=14)
