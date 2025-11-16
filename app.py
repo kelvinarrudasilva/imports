@@ -1,4 +1,4 @@
-# app.py — Dashboard Loja Importados final + hover detalhado + estoque ordenado + pesquisa
+# app.py — Dashboard Loja Importados final (mobile-friendly) + moeda sem centavos (R$ 1.290)
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -13,7 +13,7 @@ st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide")
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # ----------------------------
-# VISUAL
+# VISUAL (COM MELHORIAS MOBILE)
 # ----------------------------
 st.markdown("""
 <style>
@@ -21,15 +21,37 @@ st.markdown("""
 body, .stApp { background-color:#ffffff; color:#111; }
 h1,h2,h3,h4 { color: var(--accent-dark); }
 
-.stDataFrame thead th { background-color:#f0f8ff;}
+/* KPIs */
+.kpi-row { display:flex; gap:12px; }
+.kpi { padding:14px; border-radius:12px; color:white; min-width:150px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.kpi h3 { margin:0; font-size:16px; }
+.kpi span { font-size:20px; font-weight:700; display:block; margin-top:8px; }
+.kpi-vendas { background: linear-gradient(90deg,#4facfe,#00f2fe); }
+.kpi-lucro { background: linear-gradient(90deg,#34e89e,#0f3443); }
+.kpi-compras { background: linear-gradient(90deg,#f6d365,#fda085); color:#222; }
 
-.kpi-vendas { background-color:#9b59b6; padding:15px; border-radius:10px; text-align:center; color:white; }
-.kpi-lucro { background-color:#27ae60; padding:15px; border-radius:10px; text-align:center; color:white; }
-.kpi-compras { background-color:#f1c40f; padding:15px; border-radius:10px; text-align:center; color:white; }
-.kpi-vendas h3, .kpi-lucro h3, .kpi-compras h3 { margin:0; font-size:20px; }
-.kpi-vendas span, .kpi-lucro span, .kpi-compras span { font-size:24px; font-weight:700; }
+/* DataFrame header subtle bg */
+.stDataFrame thead th { background-color:#f7fbff; }
 
-.stTabs button { background-color:#e0e0e0 !important; border-radius:8px; margin-right:4px; }
+/* Tabs buttons look better on mobile */
+.stTabs button { background-color:#f0f0f0 !important; border-radius:10px; margin-right:6px; padding:8px 12px; }
+
+/* Responsividade: empilhar KPI e aumentar áreas tocáveis */
+@media (max-width: 720px) {
+  .kpi-row { flex-direction:column; }
+  .stButton>button, .stTabs button { padding:12px 16px !important; font-size:15px !important; }
+  .stDataFrame, .element-container { font-size:13px; }
+}
+
+/* Tornar os títulos mais compactos em mobile */
+@media (max-width: 420px) {
+  .kpi h3 { font-size:14px; }
+  .kpi span { font-size:18px; }
+}
+
+/* Ajuste geral de espaçamentos */
+.css-1d391kg { padding-top: 8px !important; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,15 +103,28 @@ def parse_int_series(serie):
             return pd.NA
     return serie.map(to_int).astype("Int64")
 
+# Formatação em reais SEM centavos: "R$ 1.290"
+def formatar_reais_sem_centavos(valor):
+    try:
+        if pd.isna(valor):
+            return "R$ 0"
+    except:
+        pass
+    try:
+        v = float(valor)
+    except:
+        return str(valor)
+    # formata sem casas decimais e usa ponto como separador de milhares
+    s = f"{v:,.0f}"  # ex: "1,290"
+    s = s.replace(',', '.')
+    return f"R$ {s}"
+
+# Aplica a formatação em colunas do dataframe
 def formatar_valor_reais(df, colunas):
     for c in colunas:
         if c in df.columns:
-            df[c] = df[c].fillna(0.0).map(lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            df[c] = df[c].fillna(0.0).map(lambda x: formatar_reais_sem_centavos(x))
     return df
-
-def formatar_reais(valor):
-    """Formata float em reais: R$ 1.299,00"""
-    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # ----------------------------
 # DETECTAR CABEÇALHO / LIMPEZA
@@ -213,10 +248,14 @@ total_vendido = (vendas_filtradas["VALOR TOTAL"].fillna(0) if "VALOR TOTAL" in v
 total_lucro = (vendas_filtradas["LUCRO UNITARIO"].fillna(0)*vendas_filtradas["QTD"].fillna(0)).sum() if "LUCRO UNITARIO" in vendas_filtradas.columns else 0
 total_compras = compras_filtradas["CUSTO TOTAL (RECALC)"].sum() if not compras_filtradas.empty else 0
 
-k1, k2, k3 = st.columns(3)
-k1.markdown(f'<div class="kpi-vendas"><h3>💵 Total Vendido</h3><span>{formatar_reais(total_vendido)}</span></div>', unsafe_allow_html=True)
-k2.markdown(f'<div class="kpi-lucro"><h3>🧾 Total Lucro</h3><span>{formatar_reais(total_lucro)}</span></div>', unsafe_allow_html=True)
-k3.markdown(f'<div class="kpi-compras"><h3>💸 Total Compras</h3><span>{formatar_reais(total_compras)}</span></div>', unsafe_allow_html=True)
+# Exibe KPIs com novo formato (sem centavos)
+k1, k2, k3 = st.columns([1,1,1])
+with k1:
+    st.markdown(f'<div class="kpi kpi-vendas"><h3>💵 Total Vendido</h3><span>{formatar_reais_sem_centavos(total_vendido)}</span></div>', unsafe_allow_html=True)
+with k2:
+    st.markdown(f'<div class="kpi kpi-lucro"><h3>🧾 Total Lucro</h3><span>{formatar_reais_sem_centavos(total_lucro)}</span></div>', unsafe_allow_html=True)
+with k3:
+    st.markdown(f'<div class="kpi kpi-compras"><h3>💸 Total Compras</h3><span>{formatar_reais_sem_centavos(total_compras)}</span></div>', unsafe_allow_html=True)
 
 # ----------------------------
 # ABAS
@@ -225,7 +264,7 @@ tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QUANTIDADE)","�
 
 # Função preparar tabela vendas
 def preparar_tabela_vendas(df):
-    df_show = df.dropna(axis=1, how='all')
+    df_show = df.dropna(axis=1, how='all').copy()
     if "DATA" in df_show.columns:
         df_show["DATA"] = df_show["DATA"].dt.strftime("%d/%m/%y")
     df_show = formatar_valor_reais(df_show, ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
@@ -252,17 +291,19 @@ with tabs[1]:
             VALOR_TOTAL=("VALOR TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
-        top_val["VALOR_TOTAL_FORMAT"] = top_val["VALOR_TOTAL"].apply(lambda x: formatar_reais(x))
+        # coluna de etiqueta sem centavos
+        top_val["VALOR_TOTAL_LABEL"] = top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig = px.bar(
             top_val,
             x="PRODUTO",
             y="VALOR_TOTAL",
-            text="VALOR_TOTAL_FORMAT",
-            hover_data={"QTD_TOTAL": True, "VALOR_TOTAL_FORMAT": True}
+            text="VALOR_TOTAL_LABEL",
+            hover_data={"QTD_TOTAL": True}
         )
         fig.update_traces(textposition="inside")
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(top_val.drop(columns=["VALOR_TOTAL_FORMAT"]), use_container_width=True)
+        fig.update_layout(margin=dict(t=30,b=30,l=10,r=10), xaxis_tickangle=-45)
+        st.plotly_chart(fig, use_container_width=True, config={"responsive": True})
+        st.dataframe(top_val.drop(columns=["VALOR_TOTAL_LABEL"]), use_container_width=True)
     else:
         st.info("Sem dados de vendas para o período selecionado.")
 
@@ -277,7 +318,8 @@ with tabs[2]:
         top_q = dfv.groupby("PRODUTO")["QTD"].sum().reset_index().sort_values("QTD", ascending=False).head(10)
         fig2 = px.bar(top_q, x="PRODUTO", y="QTD", text="QTD")
         fig2.update_traces(textposition="inside")
-        st.plotly_chart(fig2, use_container_width=True)
+        fig2.update_layout(margin=dict(t=30,b=30,l=10,r=10), xaxis_tickangle=-45)
+        st.plotly_chart(fig2, use_container_width=True, config={"responsive": True})
         st.dataframe(top_q, use_container_width=True)
     else:
         st.info("Sem dados de vendas para o período selecionado.")
@@ -293,17 +335,18 @@ with tabs[3]:
             LUCRO_TOTAL=("LUCRO_TOTAL","sum"),
             QTD_TOTAL=("QTD","sum")
         ).reset_index().sort_values("LUCRO_TOTAL", ascending=False).head(10)
-        top_lucro["LUCRO_TOTAL_FORMAT"] = top_lucro["LUCRO_TOTAL"].apply(lambda x: formatar_reais(x))
+        top_lucro["LUCRO_LABEL"] = top_lucro["LUCRO_TOTAL"].apply(formatar_reais_sem_centavos)
         fig3 = px.bar(
             top_lucro,
             x="PRODUTO",
             y="LUCRO_TOTAL",
-            text="LUCRO_TOTAL_FORMAT",
-            hover_data={"QTD_TOTAL": True, "LUCRO_TOTAL_FORMAT": True}
+            text="LUCRO_LABEL",
+            hover_data={"QTD_TOTAL": True}
         )
         fig3.update_traces(textposition="inside")
-        st.plotly_chart(fig3, use_container_width=True)
-        st.dataframe(top_lucro.drop(columns=["LUCRO_TOTAL_FORMAT"]), use_container_width=True)
+        fig3.update_layout(margin=dict(t=30,b=30,l=10,r=10), xaxis_tickangle=-45)
+        st.plotly_chart(fig3, use_container_width=True, config={"responsive": True})
+        st.dataframe(top_lucro.drop(columns=["LUCRO_LABEL"]), use_container_width=True)
     else:
         st.info("Sem dados de vendas para o período selecionado.")
 
@@ -313,9 +356,12 @@ with tabs[4]:
     st.subheader("Consulta completa do Estoque")
     if not estoque_df.empty:
         df_e = estoque_df.copy().dropna(axis=1, how='all')
-        df_e = formatar_valor_reais(df_e, ["Media C. UNITARIO","Valor Venda Sugerido"])
+        df_e = formatar_valor_reais(df_e, ["Media C. UNITARIO","Valor Venda Sugerido"]) 
         if "EM ESTOQUE" in df_e.columns:
-            df_e["EM ESTOQUE"] = df_e["EM ESTOQUE"].astype(int)
+            try:
+                df_e["EM ESTOQUE"] = df_e["EM ESTOQUE"].astype(int)
+            except:
+                pass
             df_e = df_e.sort_values("EM ESTOQUE", ascending=False)
         st.dataframe(df_e.reset_index(drop=True), use_container_width=True)
     else:
