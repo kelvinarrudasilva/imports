@@ -4,6 +4,7 @@
 # - Abas não sobrepõem KPIs (espaçamento corrigido)
 # - Gráfico semanal MAIS CLARO (agrupado por semana + data inicial/final de cada semana)
 # - Label dentro das barras, maior e limpo
+# - Tabela de vendas sem MES_ANO e sem índice extra
 
 import streamlit as st
 import pandas as pd
@@ -83,7 +84,6 @@ st.markdown(
 # =============================
 # HELPERS
 # =============================
-
 def parse_money_value(x):
     try:
         if pd.isna(x): return float("nan")
@@ -170,8 +170,8 @@ def preparar_tabela_vendas(df):
     for c in ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO","QTD"]:
         if c not in d.columns: d[c] = 0
     d = formatar_colunas_moeda(d, ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
-    d = d.loc[:, ~d.columns.astype(str).str.contains("^Unnamed")]
-    return d
+    d = d.loc[:, ~d.columns.astype(str).str.contains("^Unnamed|MES_ANO")]  # remove MES_ANO e índice estranho
+    return d.reset_index(drop=True)
 
 # =============================
 # Carregar planilha
@@ -194,7 +194,7 @@ for aba in colunas_esperadas:
         if cleaned is not None:
             dfs[aba] = cleaned
 
-# Conversores e filtros (mesmo código que já tínhamos)...
+# Conversores e filtros (igual ao código anterior)...
 
 # =============================
 # Filtro por mês
@@ -278,8 +278,8 @@ with tabs[0]:
         st.markdown("### 📄 Tabela de Vendas")
         st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
 
-# -----------------------------------------------------------------
-# O RESTO (TOP10, ESTOQUE, PESQUISA) segue igual ao código anterior
-# -----------------------------------------------------------------
+# ----------------------------
+# O RESTO (TOP10, ESTOQUE, PESQUISA) segue igual...
+# ----------------------------
 
 st.success("✅ Dashboard carregado com sucesso!")
