@@ -1,4 +1,4 @@
-# app.py — Loja Importados (roxo moderno) — CORRIGIDO (sem SyntaxError)
+# app.py — Loja Importados (roxo moderno) — CORRIGIDO (tratamento seguro de % e demais colunas)
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -9,7 +9,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide")
 
-# Default planilha (mantive seu link)
+# --- link padrão (mantive seu link) ---
 URL_PLANILHA_DEFAULT = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
@@ -51,10 +51,9 @@ body, .stApp { background: var(--bg) !important; }
 st.title("📊 Loja Importados — Dashboard (Roxo) — Corrigido")
 
 # =============================
-# Utilitários de parsing e formatação (robustos)
+# Utilitários
 # =============================
 def parse_money_value(x):
-    """Converte textos monetários diversos em float (tolerante)"""
     try:
         if pd.isna(x): return float("nan")
     except:
@@ -62,16 +61,12 @@ def parse_money_value(x):
     s = str(x).strip()
     if s == "" or s.lower() in ("nan","none","-"):
         return float("nan")
-    # remover tudo exceto dígitos, ponto, vírgula e sinal
     s = re.sub(r"[^\d\.,\-]", "", s)
-    # se tiver '.' e ',' -> assume '.' separador de milhar e ',' decimal
     if "." in s and "," in s:
         s = s.replace(".", "").replace(",", ".")
     else:
-        # se só tem vírgula -> transforma em ponto decimal
         if "," in s and "." not in s:
             s = s.replace(",", ".")
-        # se vários pontos -> remover pontos exceto último (tenta recuperar)
         if s.count(".") > 1:
             s = s.replace(".", "")
     s = re.sub(r"[^\d\.\-]", "", s)
@@ -112,11 +107,10 @@ def formatar_colunas_moeda(df, col_list):
     return df
 
 # =============================
-# Leitura e limpeza robusta das abas
+# Funções de leitura/limpeza
 # =============================
 def detectar_linha_cabecalho(df_raw, keywords):
-    """Procura linha de cabeçalho que contenha uma das keywords (lista)"""
-    for i in range(min(len(df_raw), 12)):  # só varre primeiras 12 linhas para desempenho
+    for i in range(min(len(df_raw), 12)):
         linha = " ".join(df_raw.iloc[i].astype(str).str.upper().tolist())
         for kw in keywords:
             if kw.upper() in linha:
@@ -131,63 +125,54 @@ def limpar_aba_raw(df_raw, nome_aba):
     }
     keywords = busca_map.get(nome_aba, ["PRODUTO"])
     linha = detectar_linha_cabecalho(df_raw, keywords)
-    if linha is None:
+    if linha is None: 
         return None
     df_tmp = df_raw.copy()
     df_tmp.columns = df_tmp.iloc[linha]
     df = df_tmp.iloc[linha+1:].copy()
-    # normalizar nomes de colunas
     df.columns = [str(c).strip() for c in df.columns]
-    # drop cols com nome 'nan'/'None'/vazio
-    drop_cols = [c for c in df.columns if str(c).strip().lower() in ("nan", "none", "")]
+    drop_cols = [c for c in df.columns if str(c).strip().lower() in ("nan","none","")]
     df = df.drop(columns=drop_cols, errors="ignore")
-    # remover colunas todas-NA
     df = df.loc[:, ~df.isna().all()]
     df = df.reset_index(drop=True)
     return df
 
 def carregar_xlsx_from_url(url):
-    try:
-        resp = requests.get(url, timeout=20)
-        resp.raise_for_status()
-        return pd.ExcelFile(BytesIO(resp.content))
-    except Exception as e:
-        raise
+    resp = requests.get(url, timeout=20)
+    resp.raise_for_status()
+    return pd.ExcelFile(BytesIO(resp.content))
 
-# ----------------------------
-# URL (input opcional)
-# ----------------------------
+# =============================
+# URL input
+# =============================
 url_input = st.text_input("URL da planilha do Google Drive (ou deixe vazio para usar a fixa):", value="")
 URL_PLANILHA = url_input.strip() if url_input.strip() else URL_PLANILHA_DEFAULT
 
-# ----------------------------
-# Ler planilha e tratar abas
-# ----------------------------
+# =============================
+# Ler e limpar abas
+# =============================
 try:
     xls = carregar_xlsx_from_url(URL_PLANILHA)
 except Exception as e:
-    st.error("Erro ao baixar/abrir a planilha. Verifique o link e permissões (deve estar pública ou com link de compartilhamento).")
+    st.error("Erro ao baixar/abrir a planilha. Verifique o link e permissões.")
     st.exception(e)
     st.stop()
 
 abas_all = [a for a in xls.sheet_names]
-
-colunas_esperadas = ["ESTOQUE", "VENDAS", "COMPRAS"]
+colunas_esperadas = ["ESTOQUE","VENDAS","COMPRAS"]
 dfs = {}
 
 for aba in colunas_esperadas:
     if aba in abas_all:
         raw = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
         cleaned = limpar_aba_raw(raw, aba)
-        if cleaned is None:
-            st.warning(f"Aba {aba}: cabeçalho não identificado corretamente — verifique a aba (pulei).")
-        else:
+        if cleaned is not None:
             dfs[aba] = cleaned
-    else:
-        st.info(f"Aba {aba} não encontrada na planilha.")
+        else:
+            st.warning(f"Aba {aba} — cabeçalho não identificado (pulei).")
 
 # =============================
-# Converter colunas nas abas (quando presentes)
+# Conversões por aba
 # =============================
 # Estoque
 if "ESTOQUE" in dfs:
@@ -216,17 +201,14 @@ if "VENDAS" in dfs:
         df_v["MES_ANO"] = df_v["DATA"].dt.strftime("%Y-%m")
     else:
         df_v["MES_ANO"] = pd.NA
-    # Deriva VALOR TOTAL se faltar
+    # derivar VALOR TOTAL, LUCRO UNITARIO e % se necessário
     if "VALOR TOTAL" not in df_v.columns and "VALOR VENDA" in df_v.columns:
         df_v["VALOR TOTAL"] = df_v["VALOR VENDA"].fillna(0) * df_v.get("QTD", 0).fillna(0)
-    # Deriva LUCRO UNITARIO se faltar
     if "LUCRO UNITARIO" not in df_v.columns and ("VALOR VENDA" in df_v.columns and "MEDIA CUSTO UNITARIO" in df_v.columns):
         df_v["LUCRO UNITARIO"] = df_v["VALOR VENDA"].fillna(0) - df_v["MEDIA CUSTO UNITARIO"].fillna(0)
-    # Deriva % DE LUCRO SOBRE CUSTO se faltar
     if "% DE LUCRO SOBRE CUSTO" not in df_v.columns and ("VALOR VENDA" in df_v.columns and "MEDIA CUSTO UNITARIO" in df_v.columns):
         custo = df_v["MEDIA CUSTO UNITARIO"].replace({0: pd.NA})
         df_v["% DE LUCRO SOBRE CUSTO"] = ((df_v["VALOR VENDA"] - df_v["MEDIA CUSTO UNITARIO"]) / custo * 100).round(2).fillna(0)
-    # garantir colunas numéricas sem NaN
     for col in ["VALOR VENDA","VALOR TOTAL","LUCRO UNITARIO","QTD","MEDIA CUSTO UNITARIO"]:
         if col not in df_v.columns:
             df_v[col] = 0
@@ -246,7 +228,7 @@ if "COMPRAS" in dfs:
     dfs["COMPRAS"] = df_c
 
 # =============================
-# Filtrar por mês (pré-selecionado atual)
+# filtro por mês
 # =============================
 meses = []
 if "VENDAS" in dfs:
@@ -257,10 +239,8 @@ index_padrao = mes_opcoes.index(mes_atual) if mes_atual in mes_opcoes else 0
 mes_selecionado = st.selectbox("Filtrar por mês (YYYY-MM):", mes_opcoes, index=index_padrao)
 
 def filtrar_mes_df(df):
-    if df is None or df.empty:
-        return df
-    if mes_selecionado == "Todos":
-        return df
+    if df is None or df.empty: return df
+    if mes_selecionado == "Todos": return df
     if "MES_ANO" in df.columns:
         return df[df["MES_ANO"] == mes_selecionado].copy()
     return df
@@ -269,7 +249,6 @@ vendas_filtradas = filtrar_mes_df(dfs.get("VENDAS", pd.DataFrame()))
 compras_filtradas = filtrar_mes_df(dfs.get("COMPRAS", pd.DataFrame()))
 estoque_df = dfs.get("ESTOQUE", pd.DataFrame())
 
-# ordenar por DATA desc quando houver
 if vendas_filtradas is not None and not vendas_filtradas.empty and "DATA" in vendas_filtradas.columns:
     vendas_filtradas = vendas_filtradas.sort_values("DATA", ascending=False)
 if compras_filtradas is not None and not compras_filtradas.empty and "DATA" in compras_filtradas.columns:
@@ -282,13 +261,13 @@ total_vendido = vendas_filtradas["VALOR TOTAL"].fillna(0).sum() if vendas_filtra
 total_lucro = (vendas_filtradas["LUCRO UNITARIO"].fillna(0) * vendas_filtradas["QTD"].fillna(0)).sum() if vendas_filtradas is not None and "LUCRO UNITARIO" in vendas_filtradas else 0
 total_compras = compras_filtradas["CUSTO TOTAL (RECALC)"].fillna(0).sum() if compras_filtradas is not None and "CUSTO TOTAL (RECALC)" in compras_filtradas else 0
 
-k1, k2, k3 = st.columns(3)
+k1,k2,k3 = st.columns(3)
 k1.markdown(f'<div class="kpi"><h3>💵 Total Vendido</h3><span>{formatar_reais_sem_centavos(total_vendido)}</span></div>', unsafe_allow_html=True)
 k2.markdown(f'<div class="kpi"><h3>🧾 Total Lucro</h3><span>{formatar_reais_sem_centavos(total_lucro)}</span></div>', unsafe_allow_html=True)
 k3.markdown(f'<div class="kpi"><h3>💸 Total Compras</h3><span>{formatar_reais_sem_centavos(total_compras)}</span></div>', unsafe_allow_html=True)
 
 # =============================
-# Abas e exibição de tabelas
+# abas e tabelas
 # =============================
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QTD)","📦 ESTOQUE","🔍 PESQUISAR"])
 
@@ -298,15 +277,17 @@ def preparar_tabela_vendas(df):
     df_show = df.copy()
     if "DATA" in df_show.columns:
         df_show["DATA"] = df_show["DATA"].dt.strftime("%d/%m/%Y")
-    # garantir colunas
+    # garantir colunas existentes
     for col in ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO","% DE LUCRO SOBRE CUSTO","QTD"]:
         if col not in df_show.columns:
             df_show[col] = 0
     # formatar monetários
     df_show = formatar_colunas_moeda(df_show, ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
-    # formatar % lucro — sem escapes problemáticos
+    # formatar % de lucro com conversão segura
     if "% DE LUCRO SOBRE CUSTO" in df_show.columns:
-        df_show["% DE LUCRO SOBRE CUSTO"] = df_show["% DE LUCRO SOBRE CUSTO"].fillna(0).map(lambda x: f"{float(x):.2f}%")
+        # converte para numérico (coerce erros), preenche 0 e formata
+        pct = pd.to_numeric(df_show["% DE LUCRO SOBRE CUSTO"], errors="coerce").fillna(0)
+        df_show["% DE LUCRO SOBRE CUSTO"] = pct.map(lambda x: f"{float(x):.2f}%")
     return df_show
 
 with tabs[0]:
@@ -316,7 +297,7 @@ with tabs[0]:
     else:
         st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
 
-# Top 10 valor
+# Top10 valor
 with tabs[1]:
     st.subheader("Top 10 — por VALOR")
     if vendas_filtradas is None or vendas_filtradas.empty:
@@ -324,7 +305,7 @@ with tabs[1]:
     else:
         dfv = vendas_filtradas.copy()
         if "VALOR TOTAL" not in dfv.columns and "VALOR VENDA" in dfv.columns:
-            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0) * dfv.get("QTD", 0).fillna(0)
+            dfv["VALOR TOTAL"] = dfv["VALOR VENDA"].fillna(0) * dfv.get("QTD",0).fillna(0)
         top_val = dfv.groupby("PRODUTO", dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"), QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
         top_val["VALOR_TOTAL_LABEL"] = top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig = px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL", text="VALOR_TOTAL_LABEL", hover_data=["QTD_TOTAL"], color_discrete_sequence=["#8b5cf6"])
@@ -335,7 +316,7 @@ with tabs[1]:
         display_top["VALOR_TOTAL"] = display_top["VALOR_TOTAL"].map(formatar_reais_sem_centavos)
         st.dataframe(display_top.drop(columns=["VALOR_TOTAL_LABEL"]), use_container_width=True)
 
-# Top 10 quantidade
+# Top10 qtd
 with tabs[2]:
     st.subheader("Top 10 — por QUANTIDADE")
     if vendas_filtradas is None or vendas_filtradas.empty:
