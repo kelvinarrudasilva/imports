@@ -152,7 +152,6 @@ for aba in colunas_esperadas:
 # =============================
 # Conversores e ajustes
 # =============================
-# -- ESTOQUE
 if "ESTOQUE" in dfs:
     df_e=dfs["ESTOQUE"]
     if "Media C. UNITARIO" in df_e.columns: df_e["Media C. UNITARIO"]=parse_money_series(df_e["Media C. UNITARIO"])
@@ -161,7 +160,6 @@ if "ESTOQUE" in dfs:
     if "VENDAS" in df_e.columns: df_e["VENDAS"]=parse_int_series(df_e["VENDAS"]).fillna(0)
     dfs["ESTOQUE"]=df_e
 
-# -- VENDAS
 if "VENDAS" in dfs:
     df_v=dfs["VENDAS"].copy()
     df_v.columns=[str(c).strip() for c in df_v.columns]
@@ -180,7 +178,6 @@ if "VENDAS" in dfs:
     if "LUCRO UNITARIO" not in df_v and ("VALOR VENDA" in df_v and "MEDIA CUSTO UNITARIO" in df_v): df_v["LUCRO UNITARIO"]=df_v["VALOR VENDA"].fillna(0)-df_v["MEDIA CUSTO UNITARIO"].fillna(0)
     dfs["VENDAS"]=df_v
 
-# -- COMPRAS
 if "COMPRAS" in dfs:
     df_c=dfs["COMPRAS"]
     qcols=[c for c in df_c.columns if "QUANT" in c.upper()]
@@ -250,7 +247,7 @@ with tabs[0]:
         fig_sem=px.bar(df_sem_group,x="INTERVALO",y="VALOR TOTAL",text="LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
         fig_sem.update_traces(textposition="inside",textfont_size=14)
         fig_sem.update_layout(margin=dict(t=30,b=30,l=10,r=10),xaxis_title="Semana",yaxis_title="Faturamento (R$)")
-        st.plotly_chart(fig_sem,use_container_width=True)
+        st.plotly_chart(fig_sem,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela de Vendas")
         st.dataframe(preparar_tabela_vendas(vendas_filtradas),use_container_width=True)
 
@@ -266,7 +263,7 @@ with tabs[1]:
         top_val["VALOR_TOTAL_LABEL"]=top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
         fig_top_val=px.bar(top_val,x="PRODUTO",y="VALOR_TOTAL",text="VALOR_TOTAL_LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
         fig_top_val.update_traces(textposition="inside",textfont_size=14)
-        st.plotly_chart(fig_top_val,use_container_width=True)
+        st.plotly_chart(fig_top_val,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por VALOR")
         st.dataframe(top_val[["PRODUTO","VALOR_TOTAL","QTD_TOTAL"]],use_container_width=True)
 
@@ -282,7 +279,7 @@ with tabs[2]:
         top_qtd["QTD_TOTAL_LABEL"]=top_qtd["QTD_TOTAL"].astype(str)
         fig_top_qtd=px.bar(top_qtd,x="PRODUTO",y="QTD_TOTAL",text="QTD_TOTAL_LABEL",color_discrete_sequence=["#8b5cf6"],height=400)
         fig_top_qtd.update_traces(textposition="inside",textfont_size=14)
-        st.plotly_chart(fig_top_qtd,use_container_width=True)
+        st.plotly_chart(fig_top_qtd,use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por QUANTIDADE")
         st.dataframe(top_qtd[["PRODUTO","QTD_TOTAL","VALOR_TOTAL"]],use_container_width=True)
 
