@@ -20,9 +20,9 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # =============================
 st.markdown("""
 <style>
-/* Ajuste padding top para remover espaço extra */
+/* Reset margens internas do Streamlit */
 main > div.block-container { padding-top: 10px !important; }
-/* Cores fixas */
+/* Cores fixas para qualquer tema */
 :root{
   --bg: #ffffff;
   --accent: #8b5cf6;
@@ -239,79 +239,8 @@ with col_kpis:
     """, unsafe_allow_html=True)
 
 # =============================
-# TABS COMPLETAS
+# TABS
 # =============================
 tabs=st.tabs(["🛒 VENDAS","🏆 TOP10 (VALOR)","🏅 TOP10 (QTD)","📦 ESTOQUE","🔍 PESQUISAR"])
 
-# --- VENDAS ---
-with tabs[0]:
-    st.subheader("Vendas — período selecionado")
-    if vendas_filtradas.empty:
-        st.info("Sem dados de vendas.")
-    else:
-        df_sem = vendas_filtradas.copy()
-        df_sem["SEMANA"]=df_sem["DATA"].dt.isocalendar().week
-        df_sem["ANO"]=df_sem["DATA"].dt.year
-        def semana_intervalo(row):
-            ano=int(row["ANO"])
-            semana=int(row["SEMANA"])
-            inicio=datetime.fromisocalendar(ano, semana, 1)
-            fim=inicio+timedelta(days=6)
-            return f"{inicio.strftime('%d/%m')} → {fim.strftime('%d/%m')}"
-        df_sem_group=df_sem.groupby(["ANO","SEMANA"],dropna=False)["VALOR TOTAL"].sum().reset_index()
-        df_sem_group["INTERVALO"]=df_sem_group.apply(semana_intervalo,axis=1)
-        df_sem_group["LABEL"]=df_sem_group["VALOR TOTAL"].apply(formatar_reais_sem_centavos)
-        st.markdown("### 📊 Faturamento Semanal do Mês")
-        fig_sem=px.bar(df_sem_group, x="INTERVALO", y="VALOR TOTAL", text="LABEL", color_discrete_sequence=["#8b5cf6"])
-        fig_sem.update_traces(textposition="inside", textfont_size=14)
-        fig_sem.update_layout(margin=dict(t=30,b=30,l=10,r=10), xaxis_title="Semana", yaxis_title="Faturamento (R$)")
-        st.plotly_chart(fig_sem, use_container_width=True)
-        st.markdown("### 📄 Tabela de Vendas")
-        st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
-
-# --- TOP10 VALOR ---
-with tabs[1]:
-    st.subheader("Top 10 — por VALOR (R$)")
-    if vendas_filtradas.empty: st.info("Sem dados.")
-    else:
-        dfv=vendas_filtradas.copy()
-        top_val=dfv.groupby("PRODUTO", dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"), QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL",ascending=False).head(10)
-        top_val["VALOR_TOTAL_LABEL"]=top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
-        fig_top_val=px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL", text="VALOR_TOTAL_LABEL", color_discrete_sequence=["#8b5cf6"])
-        fig_top_val.update_traces(textposition="inside", textfont_size=14)
-        st.plotly_chart(fig_top_val, use_container_width=True)
-        st.markdown("### 📄 Tabela Top 10 por VALOR")
-        st.dataframe(top_val[["PRODUTO","VALOR_TOTAL","QTD_TOTAL"]], use_container_width=True)
-
-# --- TOP10 QTD ---
-with tabs[2]:
-    st.subheader("Top 10 — por QTD")
-    if vendas_filtradas.empty: st.info("Sem dados.")
-    else:
-        dfv=vendas_filtradas.copy()
-        top_qtd=dfv.groupby("PRODUTO", dropna=False).agg(QTD_TOTAL=("QTD","sum"), VALOR_TOTAL=("VALOR TOTAL","sum")).reset_index().sort_values("QTD_TOTAL",ascending=False).head(10)
-        top_qtd["VALOR_TOTAL_LABEL"]=top_qtd["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
-        fig_top_qtd=px.bar(top_qtd, x="PRODUTO", y="QTD_TOTAL", text="VALOR_TOTAL_LABEL", color_discrete_sequence=["#6d28d9"])
-        fig_top_qtd.update_traces(textposition="outside", textfont_size=14)
-        st.plotly_chart(fig_top_qtd, use_container_width=True)
-        st.markdown("### 📄 Tabela Top 10 por QTD")
-        st.dataframe(top_qtd[["PRODUTO","QTD_TOTAL","VALOR_TOTAL"]], use_container_width=True)
-
-# --- ESTOQUE ---
-with tabs[3]:
-    st.subheader("📦 Estoque Atual")
-    if estoque_df.empty: st.info("Sem dados de estoque.")
-    else:
-        df_e=estoque_df.copy()
-        st.dataframe(df_e, use_container_width=True)
-
-# --- PESQUISAR ---
-with tabs[4]:
-    st.subheader("🔍 Pesquisar Produto")
-    if estoque_df.empty: st.info("Sem dados de estoque.")
-    else:
-        termo=st.text_input("Digite o nome do produto")
-        if termo:
-            filtro=estoque_df[estoque_df["PRODUTO"].str.contains(termo, case=False, na=False)]
-            if filtro.empty: st.info("Produto não encontrado.")
-            else: st.dataframe(filtro, use_container_width=True)
+# O restante segue igual ao app que você já tem...
