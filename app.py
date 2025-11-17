@@ -127,6 +127,13 @@ def formatar_reais_sem_centavos(v):
     # sem centavos, separador de milhares ponto
     return f"R$ {f'{v:,.0f}'.replace(',','.')}"
 
+def formatar_reais_com_centavos(v):
+    try: v=float(v)
+    except: return "R$ 0,00"
+    # com centavos, separador de milhares ponto e decimais vírgula
+    s = f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {s}"
+
 def formatar_colunas_moeda(df, cols):
     for c in cols:
         if c in df.columns: df[c]=df[c].fillna(0).map(lambda x: formatar_reais_sem_centavos(x))
@@ -259,6 +266,9 @@ if "VENDAS" in dfs:
         df_v["VALOR TOTAL"]=df_v["VALOR VENDA"].fillna(0)*df_v.get("QTD",0).fillna(0)
     if "LUCRO UNITARIO" not in df_v and ("VALOR VENDA" in df_v and "MEDIA CUSTO UNITARIO" in df_v):
         df_v["LUCRO UNITARIO"]=df_v["VALOR VENDA"].fillna(0)-df_v["MEDIA CUSTO UNITARIO"].fillna(0)
+    # --- Garantir ordenação: mais recente primeiro
+    if "DATA" in df_v.columns:
+        df_v = df_v.sort_values("DATA", ascending=False).reset_index(drop=True)
     dfs["VENDAS"] = df_v
 
 # COMPRAS
@@ -312,6 +322,10 @@ def filtrar_mes_df(df,mes):
     return df[df["MES_ANO"]==mes].copy() if "MES_ANO" in df.columns else df
 
 vendas_filtradas = filtrar_mes_df(dfs.get("VENDAS", pd.DataFrame()), mes_selecionado)
+# garantir que vendas_filtradas esteja ordenado por DATA desc (mais recentes primeiro)
+if not vendas_filtradas.empty and "DATA" in vendas_filtradas.columns:
+    vendas_filtradas = vendas_filtradas.sort_values("DATA", ascending=False).reset_index(drop=True)
+
 compras_filtradas = filtrar_mes_df(dfs.get("COMPRAS", pd.DataFrame()), mes_selecionado)
 
 # =============================
@@ -360,6 +374,8 @@ with tabs[0]:
         df_sem = vendas_filtradas.copy()
         # evitar erros caso DATA tenha NaT
         df_sem["DATA"] = pd.to_datetime(df_sem.get("DATA", pd.NaT), errors="coerce")
+        # garantir ordenação mais recente primeiro
+        df_sem = df_sem.sort_values("DATA", ascending=False).reset_index(drop=True)
         df_sem["SEMANA"] = df_sem["DATA"].dt.isocalendar().week
         df_sem["ANO"] = df_sem["DATA"].dt.year
         def semana_intervalo(row):
@@ -379,7 +395,9 @@ with tabs[0]:
             fig_sem.update_traces(textposition="inside", textfont_size=12)
             st.plotly_chart(fig_sem, use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela de Vendas")
-        st.dataframe(preparar_tabela_vendas(vendas_filtradas), use_container_width=True)
+        # já ordenada por DATA desc
+        tabela_vendas_exib = preparar_tabela_vendas(df_sem)
+        st.dataframe(tabela_vendas_exib, use_container_width=True)
 
 # =============================
 # TOP10 VALOR
@@ -434,14 +452,52 @@ with tabs[3]:
         estoque_display = estoque_df.copy()
         estoque_display["VALOR_CUSTO_TOTAL"] = (estoque_display["Media C. UNITARIO"] * estoque_display["EM ESTOQUE"]).fillna(0)
         estoque_display["VALOR_VENDA_TOTAL"] = (estoque_display["Valor Venda Sugerido"] * estoque_display["EM ESTOQUE"]).fillna(0)
-        # formata colunas monetárias para exibição
-        estoque_display["Media C. UNITARIO"] = estoque_display["Media C. UNITARIO"].map(formatar_reais_sem_centavos)
-        estoque_display["Valor Venda Sugerido"] = estoque_display["Valor Venda Sugerido"].map(formatar_reais_sem_centavos)
-        estoque_display["VALOR_CUSTO_TOTAL"] = estoque_display["VALOR_CUSTO_TOTAL"].map(formatar_reais_sem_centavos)
-        estoque_display["VALOR_VENDA_TOTAL"] = estoque_display["VALOR_VENDA_TOTAL"].map(formatar_reais_sem_centavos)
-        # exibir apenas colunas úteis
-        cols_order = [c for c in ["PRODUTO","EM ESTOQUE","Media C. UNITARIO","Valor Venda Sugerido","VALOR_CUSTO_TOTAL","VALOR_VENDA_TOTAL"] if c in estoque_display.columns]
-        st.dataframe(estoque_display[cols_order].reset_index(drop=True), use_container_width=True)
+
+        # -------------------
+        # Gráfico Pizza — Top5 (por quantidade em estoque)
+        # -------------------
+        top5 = estoque_display.sort_values("EM ESTOQUE", ascending=False).head(5).copy()
+        if not top5.empty:
+            fig_pie = px.pie(top5, names="PRODUTO", values="EM ESTOQUE", title="Top 5 — Itens com maior estoque", hole=0.45)
+            fig_pie.update_traces(textinfo="percent+label", pull=[0.05 if i==0 else 0 for i in range(len(top5))])
+            plotly_dark_config(fig_pie)
+            st.plotly_chart(fig_pie, use_container_width=True, config=dict(displayModeBar=False, responsive=True))
+
+        # -------------------
+        # Tabela clássica — formato que você pediu (PRODUTO / EM ESTOQUE / CUSTO UNITÁRIO / PREÇO SUGERIDO / VALOR TOTAL CUSTO / VALOR TOTAL VENDA)
+        # - CUSTO UNITÁRIO e VALOR VENDA SUGERIDO: com centavos (R$ 1.692,00)
+        # - VALOR TOTAL CUSTO e VALOR TOTAL VENDA: sem centavos (R$ 1.692)
+        # -------------------
+        estoque_clas = estoque_display.copy()
+        # garantir colunas
+        if "Media C. UNITARIO" not in estoque_clas.columns:
+            estoque_clas["Media C. UNITARIO"] = estoque_clas.get("Media C. UNITARIO", 0)
+        if "Valor Venda Sugerido" not in estoque_clas.columns:
+            estoque_clas["Valor Venda Sugerido"] = estoque_clas.get("Valor Venda Sugerido", 0)
+        # cálculos
+        estoque_clas["VALOR_TOTAL_CUSTO_RAW"] = (estoque_clas["Media C. UNITARIO"] * estoque_clas["EM ESTOQUE"]).fillna(0)
+        estoque_clas["VALOR_TOTAL_VENDA_RAW"] = (estoque_clas["Valor Venda Sugerido"] * estoque_clas["EM ESTOQUE"]).fillna(0)
+        # formatações
+        estoque_clas["CUSTO_UNITARIO_FMT"] = estoque_clas["Media C. UNITARIO"].map(formatar_reais_com_centavos)
+        estoque_clas["VENDA_SUGERIDA_FMT"] = estoque_clas["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+        estoque_clas["VALOR_TOTAL_CUSTO_FMT"] = estoque_clas["VALOR_TOTAL_CUSTO_RAW"].map(formatar_reais_sem_centavos)
+        estoque_clas["VALOR_TOTAL_VENDA_FMT"] = estoque_clas["VALOR_TOTAL_VENDA_RAW"].map(formatar_reais_sem_centavos)
+
+        cols_order = [c for c in ["PRODUTO","EM ESTOQUE","CUSTO_UNITARIO_FMT","VENDA_SUGERIDA_FMT","VALOR_TOTAL_CUSTO_FMT","VALOR_TOTAL_VENDA_FMT"]]
+        display_cols = {
+            "PRODUTO": "PRODUTO",
+            "EM ESTOQUE": "EM ESTOQUE",
+            "CUSTO_UNITARIO_FMT": "CUSTO UNITÁRIO",
+            "VENDA_SUGERIDA_FMT": "VENDA SUGERIDA",
+            "VALOR_TOTAL_CUSTO_FMT": "VALOR TOTAL CUSTO",
+            "VALOR_TOTAL_VENDA_FMT": "VALOR TOTAL VENDA"
+        }
+        display_df = estoque_clas[list(display_cols.keys())].rename(columns=display_cols)
+        # ordenar clássico por EM ESTOQUE decrescente (como você pediu)
+        if "EM ESTOQUE" in display_df.columns:
+            display_df = display_df.sort_values("EM ESTOQUE", ascending=False).reset_index(drop=True)
+        st.markdown("### 📋 Estoque — visão clássica")
+        st.dataframe(display_df, use_container_width=True)
 
 # =============================
 # PESQUISAR
@@ -460,9 +516,9 @@ with tabs[4]:
                 df_search_display = df_search.copy()
                 # formata colunas monetárias
                 if "Media C. UNITARIO" in df_search_display.columns:
-                    df_search_display["Media C. UNITARIO"] = df_search_display["Media C. UNITARIO"].map(formatar_reais_sem_centavos)
+                    df_search_display["Media C. UNITARIO"] = df_search_display["Media C. UNITARIO"].map(formatar_reais_com_centavos)
                 if "Valor Venda Sugerido" in df_search_display.columns:
-                    df_search_display["Valor Venda Sugerido"] = df_search_display["Valor Venda Sugerido"].map(formatar_reais_sem_centavos)
+                    df_search_display["Valor Venda Sugerido"] = df_search_display["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
                 st.dataframe(df_search_display.reset_index(drop=True), use_container_width=True)
 
 # =============================
