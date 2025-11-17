@@ -440,64 +440,53 @@ with tabs[2]:
         top_qtd_display["VALOR_TOTAL"] = top_qtd_display["VALOR_TOTAL"].map(formatar_reais_sem_centavos)
         st.dataframe(top_qtd_display[["PRODUTO","QTD_TOTAL","VALOR_TOTAL"]], use_container_width=True)
 
-# =============================
-# ESTOQUE
-# =============================
-with tabs[3]:
-    st.subheader("Estoque Atual (valores calculados independentes do filtro)")
-    if estoque_df.empty:
-        st.info("Sem dados de estoque.")
+# =======================
+# ABA: ESTOQUE
+# =======================
+with aba_estoque:
+
+    st.markdown("## 📦 Estoque — visão clássica")
+
+    # -----------------------
+    # FILTRO DE CATEGORIA
+    # -----------------------
+    categorias = df["Categoria"].dropna().unique()
+    categoria_escolhida = st.multiselect("Filtrar por categoria:", categorias)
+
+    if categoria_escolhida:
+        df_estoque = df[df["Categoria"].isin(categoria_escolhida)].copy()
     else:
-        # adiciona colunas de valor calculado por linha para exibir
-        estoque_display = estoque_df.copy()
-        estoque_display["VALOR_CUSTO_TOTAL"] = (estoque_display["Media C. UNITARIO"] * estoque_display["EM ESTOQUE"]).fillna(0)
-        estoque_display["VALOR_VENDA_TOTAL"] = (estoque_display["Valor Venda Sugerido"] * estoque_display["EM ESTOQUE"]).fillna(0)
+        df_estoque = df.copy()
 
-        # -------------------
-        # Gráfico Pizza — Top5 (por quantidade em estoque)
-        # -------------------
-        top5 = estoque_display.sort_values("EM ESTOQUE", ascending=False).head(5).copy()
-        if not top5.empty:
-            fig_pie = px.pie(top5, names="PRODUTO", values="EM ESTOQUE", title="Top 5 — Itens com maior estoque", hole=0.45)
-            fig_pie.update_traces(textinfo="percent+label", pull=[0.05 if i==0 else 0 for i in range(len(top5))])
-            plotly_dark_config(fig_pie)
-            st.plotly_chart(fig_pie, use_container_width=True, config=dict(displayModeBar=False, responsive=True))
+    # -----------------------
+    # GRÁFICO DE ESTOQUE
+    # -----------------------
+    st.markdown("### 🥧 Distribuição de estoque por categoria")
 
-        # -------------------
-        # Tabela clássica — formato que você pediu (PRODUTO / EM ESTOQUE / CUSTO UNITÁRIO / PREÇO SUGERIDO / VALOR TOTAL CUSTO / VALOR TOTAL VENDA)
-        # - CUSTO UNITÁRIO e VALOR VENDA SUGERIDO: com centavos (R$ 1.692,00)
-        # - VALOR TOTAL CUSTO e VALOR TOTAL VENDA: sem centavos (R$ 1.692)
-        # -------------------
-        estoque_clas = estoque_display.copy()
-        # garantir colunas
-        if "Media C. UNITARIO" not in estoque_clas.columns:
-            estoque_clas["Media C. UNITARIO"] = estoque_clas.get("Media C. UNITARIO", 0)
-        if "Valor Venda Sugerido" not in estoque_clas.columns:
-            estoque_clas["Valor Venda Sugerido"] = estoque_clas.get("Valor Venda Sugerido", 0)
-        # cálculos
-        estoque_clas["VALOR_TOTAL_CUSTO_RAW"] = (estoque_clas["Media C. UNITARIO"] * estoque_clas["EM ESTOQUE"]).fillna(0)
-        estoque_clas["VALOR_TOTAL_VENDA_RAW"] = (estoque_clas["Valor Venda Sugerido"] * estoque_clas["EM ESTOQUE"]).fillna(0)
-        # formatações
-        estoque_clas["CUSTO_UNITARIO_FMT"] = estoque_clas["Media C. UNITARIO"].map(formatar_reais_com_centavos)
-        estoque_clas["VENDA_SUGERIDA_FMT"] = estoque_clas["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
-        estoque_clas["VALOR_TOTAL_CUSTO_FMT"] = estoque_clas["VALOR_TOTAL_CUSTO_RAW"].map(formatar_reais_sem_centavos)
-        estoque_clas["VALOR_TOTAL_VENDA_FMT"] = estoque_clas["VALOR_TOTAL_VENDA_RAW"].map(formatar_reais_sem_centavos)
+    df_pizza = df_estoque.groupby("Categoria")["Quantidade"].sum().reset_index()
 
-        cols_order = [c for c in ["PRODUTO","EM ESTOQUE","CUSTO_UNITARIO_FMT","VENDA_SUGERIDA_FMT","VALOR_TOTAL_CUSTO_FMT","VALOR_TOTAL_VENDA_FMT"]]
-        display_cols = {
-            "PRODUTO": "PRODUTO",
-            "EM ESTOQUE": "EM ESTOQUE",
-            "CUSTO_UNITARIO_FMT": "CUSTO UNITÁRIO",
-            "VENDA_SUGERIDA_FMT": "VENDA SUGERIDA",
-            "VALOR_TOTAL_CUSTO_FMT": "VALOR TOTAL CUSTO",
-            "VALOR_TOTAL_VENDA_FMT": "VALOR TOTAL VENDA"
-        }
-        display_df = estoque_clas[list(display_cols.keys())].rename(columns=display_cols)
-        # ordenar clássico por EM ESTOQUE decrescente (como você pediu)
-        if "EM ESTOQUE" in display_df.columns:
-            display_df = display_df.sort_values("EM ESTOQUE", ascending=False).reset_index(drop=True)
-        st.markdown("### 📋 Estoque — visão clássica")
-        st.dataframe(display_df, use_container_width=True)
+    fig_pizza = px.pie(
+        df_pizza,
+        names="Categoria",
+        values="Quantidade",
+        hole=0.35
+    )
+
+    # Quantidades dentro da pizza
+    fig_pizza.update_traces(
+        textinfo="label+value",
+        textposition="inside"
+    )
+
+    st.plotly_chart(fig_pizza, use_container_width=True)
+
+    # -----------------------
+    # TABELA PRINCIPAL DO ESTOQUE
+    # -----------------------
+    st.markdown("### 📋 Tabela de estoque completa")
+    df_estoque_ordenado = df_estoque.sort_values(by="Produto", ascending=True)
+    st.dataframe(df_estoque_ordenado)
+
 
 # =============================
 # PESQUISAR
@@ -529,3 +518,4 @@ st.markdown("""
   <em>Nota:</em> Valores de estoque (custo & venda) são calculados a partir das colunas <strong>Media C. UNITARIO</strong>, <strong>Valor Venda Sugerido</strong> e <strong>EM ESTOQUE</strong> — estes indicadores não são afetados pelo filtro de mês.
 </div>
 """, unsafe_allow_html=True)
+
