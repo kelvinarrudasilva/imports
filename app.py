@@ -488,7 +488,7 @@ with tabs[3]:
         st.dataframe(display_df, use_container_width=True)
 
 # =============================
-# PESQUISAR (versão poderosa)
+# PESQUISAR (versão ultra sensível)
 # =============================
 import unicodedata
 import difflib
@@ -498,7 +498,10 @@ def normalizar(texto):
         return ""
     texto = unicodedata.normalize("NFD", texto)
     texto = texto.encode("ascii", "ignore").decode("utf-8")
-    return texto.lower()
+    return texto.lower().strip()
+
+def gerar_ngrams(texto, tamanho=3):
+    return [texto[i:i+tamanho] for i in range(len(texto)-tamanho+1)]
 
 with tabs[4]:
     st.subheader("Pesquisar produtos")
@@ -522,26 +525,41 @@ with tabs[4]:
             for i, row in estoque_df.iterrows():
                 nome = row["_search"]
 
-                # 1) contém direto
+                score_final = 0
+
+                # 1) CONTÉM DIRETO EM QUALQUER PARTE
                 if termo_norm in nome:
-                    resultados.append((i, 1.0))
-                    continue
+                    score_final = 1.0
 
-                # 2) todos tokens presentes
-                if all(tok in nome for tok in tokens):
-                    resultados.append((i, 0.95))
-                    continue
+                # 2) TODOS OS TOKENS PRESENTES
+                elif all(tok in nome for tok in tokens):
+                    score_final = 0.95
 
-                # 3) pelo menos um token presente
-                if any(tok in nome for tok in tokens):
-                    resultados.append((i, 0.75))
-                    continue
+                # 3) ALGUNS TOKENS PRESENTES
+                elif any(tok in nome for tok in tokens):
+                    score_final = 0.80
 
-                # 4) similaridade aproximada
-                score = difflib.SequenceMatcher(None, termo_norm, nome).ratio()
-                if score >= 0.40:
-                    resultados.append((i, score))
-                    continue
+                else:
+                    # 4) SIMILARIDADE APROXIMADA GLOBAL
+                    sim_global = difflib.SequenceMatcher(None, termo_norm, nome).ratio()
+
+                    # 5) SIMILARIDADE PARCIAL VIA N-GRAMS
+                    ngrams_nome = gerar_ngrams(nome)
+                    ngrams_termo = gerar_ngrams(termo_norm)
+
+                    melhor_parcial = 0
+                    for ng1 in ngrams_termo:
+                        for ng2 in ngrams_nome:
+                            parcial = difflib.SequenceMatcher(None, ng1, ng2).ratio()
+                            if parcial > melhor_parcial:
+                                melhor_parcial = parcial
+
+                    # mistura poderosa das duas
+                    score_final = max(sim_global, melhor_parcial * 0.85)
+
+                # LIMIAR MAIS PERMISSIVO
+                if score_final >= 0.32:
+                    resultados.append((i, score_final))
 
             if not resultados:
                 st.warning("Nenhum produto encontrado.")
@@ -559,6 +577,7 @@ with tabs[4]:
 
                 st.dataframe(df_search.reset_index(drop=True), use_container_width=True)
 
+
 # =============================
 # Rodapé simples
 # =============================
@@ -567,6 +586,7 @@ st.markdown("""
   <em>Nota:</em> Valores de estoque (custo & venda) são calculados a partir das colunas <strong>Media C. UNITARIO</strong>, <strong>Valor Venda Sugerido</strong> e <strong>EM ESTOQUE</strong> — estes indicadores não são afetados pelo filtro de mês.
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
