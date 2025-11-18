@@ -2,11 +2,18 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import re
 from datetime import datetime, timedelta
 import requests
 from io import BytesIO
+import unicodedata
+import difflib
+import numpy as np
 
+# ---------------------------
+# Config
+# ---------------------------
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
@@ -124,7 +131,6 @@ def parse_int_series(serie):
 def formatar_reais_sem_centavos(v):
     try: v=float(v)
     except: return "R$ 0"
-    # sem centavos, separador de milhares ponto
     return f"R$ {f'{v:,.0f}'.replace(',','.')}" 
 
 def formatar_reais_com_centavos(v):
@@ -169,7 +175,6 @@ def preparar_tabela_vendas(df):
         if c not in d.columns: d[c]=0
     d=formatar_colunas_moeda(d,["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
     d=d.loc[:,~d.columns.astype(str).str.contains("^Unnamed|MES_ANO")]
-    # garantir ordenação: mais recente primeiro (se houver DATA convertida)
     if "DATA" in d.columns:
         try:
             d["_sort"] = pd.to_datetime(d["DATA"].str.replace("/","-"), format="%d-%m-%Y", errors="coerce")
@@ -216,6 +221,7 @@ for aba in colunas_esperadas:
 # Normaliza colunas de estoque
 if "ESTOQUE" in dfs:
     df_e = dfs["ESTOQUE"].copy()
+    # coluna media custo
     if "Media C. UNITARIO" in df_e.columns:
         df_e["Media C. UNITARIO"] = parse_money_series(df_e["Media C. UNITARIO"]).fillna(0)
     else:
@@ -223,6 +229,7 @@ if "ESTOQUE" in dfs:
             if alt in df_e.columns:
                 df_e["Media C. UNITARIO"] = parse_money_series(df_e[alt]).fillna(0)
                 break
+    # valor venda sugerido
     if "Valor Venda Sugerido" in df_e.columns:
         df_e["Valor Venda Sugerido"] = parse_money_series(df_e["Valor Venda Sugerido"]).fillna(0)
     else:
@@ -230,6 +237,7 @@ if "ESTOQUE" in dfs:
             if alt in df_e.columns:
                 df_e["Valor Venda Sugerido"] = parse_money_series(df_e[alt]).fillna(0)
                 break
+    # estoque qty
     if "EM ESTOQUE" in df_e.columns:
         df_e["EM ESTOQUE"] = parse_int_series(df_e["EM ESTOQUE"]).fillna(0).astype(int)
     else:
@@ -237,6 +245,7 @@ if "ESTOQUE" in dfs:
             if alt in df_e.columns:
                 df_e["EM ESTOQUE"] = parse_int_series(df_e[alt]).fillna(0).astype(int)
                 break
+    # produto column fallback
     if "PRODUTO" not in df_e.columns:
         for c in df_e.columns:
             if df_e[c].dtype == object:
@@ -258,7 +267,11 @@ if "VENDAS" in dfs:
                 df_v[target]=parse_money_series(df_v[v])
                 break
     qtd_cols=[c for c in df_v.columns if c.upper() in ("QTD","QUANTIDADE","QTY")]
-    if qtd_cols: df_v["QTD"]=parse_int_series(df_v[qtd_cols[0]]).fillna(0).astype(int)
+    if qtd_cols:
+        df_v["QTD"]=parse_int_series(df_v[qtd_cols[0]]).fillna(0).astype(int)
+    else:
+        # se não existir QTD, tente inferir 1 por linha
+        df_v["QTD"] = 1
     if "DATA" in df_v.columns:
         df_v["DATA"]=pd.to_datetime(df_v["DATA"],errors="coerce")
         df_v["MES_ANO"]=df_v["DATA"].dt.strftime("%Y-%m")
@@ -349,35 +362,165 @@ with col_kpis:
 tabs = st.tabs(["🛒 VENDAS","🏆 TOP10 VENDAS (VALOR)","🏅 TOP10 VENDAS (QTD)","📦 ESTOQUE","🔍 PESQUISAR"])
 
 # =============================
-# VENDAS
+# VENDAS — com Top3 gráfico + linha de tendência + previsão
 # =============================
 with tabs[0]:
     st.subheader("Vendas — período selecionado")
+
     if vendas_filtradas.empty:
         st.info("Sem dados de vendas.")
     else:
         df_sem = vendas_filtradas.copy()
         df_sem["DATA"] = pd.to_datetime(df_sem.get("DATA", pd.NaT), errors="coerce")
-        # garantir ordenação mais recente primeiro
         df_sem = df_sem.sort_values("DATA", ascending=False).reset_index(drop=True)
-        df_sem["SEMANA"] = df_sem["DATA"].dt.isocalendar().week
-        df_sem["ANO"] = df_sem["DATA"].dt.year
-        def semana_intervalo(row):
-            try:
-                inicio = datetime.fromisocalendar(int(row["ANO"]), int(row["SEMANA"]), 1)
-                fim = inicio + timedelta(days=6)
-                return f"{inicio.strftime('%d/%m')} → {fim.strftime('%d/%m')}"
-            except:
-                return "N/A"
-        df_sem_group = df_sem.groupby(["ANO","SEMANA"], dropna=False)["VALOR TOTAL"].sum().reset_index()
-        if not df_sem_group.empty:
-            df_sem_group["INTERVALO"] = df_sem_group.apply(semana_intervalo, axis=1)
-            df_sem_group["LABEL"] = df_sem_group["VALOR TOTAL"].apply(formatar_reais_sem_centavos)
-            st.markdown("### 📊 Faturamento Semanal do Mês")
-            fig_sem = px.bar(df_sem_group, x="INTERVALO", y="VALOR TOTAL", text="LABEL", color_discrete_sequence=["#8b5cf6"], height=380)
-            plotly_dark_config(fig_sem)
-            fig_sem.update_traces(textposition="inside", textfont_size=12)
-            st.plotly_chart(fig_sem, use_container_width=True, config=dict(displayModeBar=False))
+
+        # --- gráfico Top3 últimos 6 meses (horizontal bar com % e tooltip) ---
+        st.markdown("### 🏆 Top 3 — últimos 6 meses (resumo)")
+        limite = datetime.now() - timedelta(days=180)
+        df6 = df_sem[df_sem["DATA"] >= limite].copy()
+
+        if df6.empty:
+            st.info("Sem vendas nos últimos 6 meses.")
+        else:
+            agg = df6.groupby("PRODUTO", dropna=False).agg(
+                QTD_TOTAL = ("QTD","sum"),
+                VALOR_TOTAL = ("VALOR TOTAL","sum"),
+                LUCRO_TOTAL = (lambda d: "LUCRO UNITARIO" in df6.columns and "QTD" in df6.columns, "sum") # dummy, adjusted below
+            ).reset_index()
+
+            # safer: compute lucro total properly if available
+            if "LUCRO UNITARIO" in df6.columns:
+                lucro_agg = df6.groupby("PRODUTO", dropna=False).apply(lambda g: (g.get("LUCRO UNITARIO",0).fillna(0)*(g.get("QTD",0).fillna(0))).sum()).reset_index(name="LUCRO_TOTAL")
+                agg = agg.drop(columns=[c for c in ["LUCRO_TOTAL"] if c in agg.columns], errors="ignore").merge(lucro_agg, on="PRODUTO", how="left")
+            else:
+                agg["LUCRO_TOTAL"] = 0
+
+            agg = agg.sort_values("QTD_TOTAL", ascending=False).reset_index(drop=True)
+            top3 = agg.head(3).copy()
+            total_qtd_period = agg["QTD_TOTAL"].sum()
+            if total_qtd_period == 0:
+                top3["PCT"] = 0
+            else:
+                top3["PCT"] = (top3["QTD_TOTAL"] / total_qtd_period) * 100
+
+            # abrevia nomes longos
+            def abbreviate(name, max_len=20):
+                if not isinstance(name, str): return ""
+                return name if len(name) <= max_len else name[:max_len].rstrip() + "…"
+
+            top3["PRODUTO_ABV"] = top3["PRODUTO"].apply(abbreviate)
+
+            # horizontal bar
+            fig_h = px.bar(
+                top3,
+                x="QTD_TOTAL",
+                y="PRODUTO_ABV",
+                orientation="h",
+                text="QTD_TOTAL",
+                hover_data={"PRODUTO":True, "VALOR_TOTAL":":.2f", "LUCRO_TOTAL":":.2f", "PCT":":.1f"},
+                height=300
+            )
+            fig_h.update_layout(margin=dict(l=40, r=10, t=30, b=30))
+            fig_h.update_traces(textposition="outside")
+            plotly_dark_config(fig_h)
+            st.plotly_chart(fig_h, use_container_width=True, config=dict(displayModeBar=False))
+
+            # small summary row (percent + totals)
+            col1, col2, col3 = st.columns([2,2,2])
+            col1.metric("Top3 Qtd (soma)", int(top3["QTD_TOTAL"].sum()))
+            col2.metric("Participação Top3", f"{top3['PCT'].sum():.1f}%")
+            col3.metric("Período", f"Últimos 6 meses")
+
+            # --- linha de tendência mensal por produto (últimos 6 meses) + previsão simples ---
+            st.markdown("### 📈 Tendência mensal (últimos 6 meses) — + previsão para próximo mês")
+            # prepare monthly series for each of top3 products
+            meses_range = pd.date_range(end=datetime.now(), periods=6, freq='M').to_series().dt.to_period('M').astype(str).tolist()
+            # We'll build a df with columns: MES (YYYY-MM), PRODUTO, QTD
+            df6["MES"] = df6["DATA"].dt.to_period('M').astype(str)
+            monthly = df6.groupby(["PRODUTO","MES"], dropna=False).agg(QTD=("QTD","sum"), VALOR=("VALOR TOTAL","sum")).reset_index()
+
+            # ensure months exist for each product
+            prod_lines = []
+            predictions = []
+            for prod in top3["PRODUTO"].tolist():
+                row = {"PRODUTO": prod}
+                s = monthly[monthly["PRODUTO"]==prod].set_index("MES").reindex(meses_range).fillna(0).reset_index()
+                s.rename(columns={"index":"MES"}, inplace=True)
+                s["MES_ORD"] = range(len(s))  # 0..5
+                x = s["MES_ORD"].values
+                y = s["QTD"].values.astype(float)
+                # linear fit if variance exists
+                pred_next = 0
+                slope = 0
+                intercept = 0
+                if len(x) >= 2 and y.sum() > 0:
+                    try:
+                        coeffs = np.polyfit(x, y, 1)
+                        slope, intercept = coeffs[0], coeffs[1]
+                        pred_next = max(0, int(np.round(np.polyval(coeffs, len(x)))))
+                    except Exception:
+                        pred_next = int(round(float(y[-1]) if len(y)>0 else 0))
+                else:
+                    pred_next = int(round(float(y[-1]) if len(y)>0 else 0))
+                # store prediction
+                predictions.append({
+                    "PRODUTO": prod,
+                    "PRED_NEXT_QTD": int(pred_next),
+                    "SLOPE": float(slope),
+                    "LAST_QTD": int(y[-1]) if len(y)>0 else 0
+                })
+                s["PRODUTO"] = prod
+                prod_lines.append(s[["MES","PRODUTO","QTD"]])
+
+            pred_df = pd.DataFrame(predictions).sort_values("PRED_NEXT_QTD", ascending=False).reset_index(drop=True)
+            # plot lines
+            fig_lines = go.Figure()
+            for s in prod_lines:
+                prod_name = s["PRODUTO"].iloc[0]
+                abv = abbreviate(prod_name, max_len=16)
+                fig_lines.add_trace(go.Scatter(
+                    x=s["MES"],
+                    y=s["QTD"],
+                    mode="lines+markers",
+                    name=abv,
+                    hovertemplate="%{y} unidades<br>%{x}<extra></extra>"
+                ))
+                # add predicted point (dashed)
+                last_mes = s["MES"].iloc[-1]
+                pred_row = pred_df[pred_df["PRODUTO"]==prod_name]
+                if not pred_row.empty:
+                    pred_q = int(pred_row["PRED_NEXT_QTD"].iloc[0])
+                    fig_lines.add_trace(go.Scatter(
+                        x=[ "Próx" ],
+                        y=[ pred_q ],
+                        mode="markers",
+                        marker=dict(symbol="diamond", size=10),
+                        name=f"{abv} (prev)",
+                        hovertemplate=f"{pred_q} unidades (prev.)<extra></extra>",
+                        showlegend=False
+                    ))
+            fig_lines.update_layout(height=380, margin=dict(t=30,b=30,l=10,r=10))
+            plotly_dark_config(fig_lines)
+            st.plotly_chart(fig_lines, use_container_width=True, config=dict(displayModeBar=False))
+
+            # --- tabela preditiva resumida ---
+            st.markdown("### 🔮 Previsão rápida e tendência")
+            if not pred_df.empty:
+                pred_df_display = pred_df.copy()
+                # add arrow for slope
+                def slope_arrow(s):
+                    if s > 0.5: return "⬆ Forte"
+                    if s > 0.05: return "⬆"
+                    if s < -0.5: return "⬇ Forte"
+                    if s < -0.05: return "⬇"
+                    return "→ Estável"
+                pred_df_display["TENDÊNCIA"] = pred_df_display["SLOPE"].map(slope_arrow)
+                pred_df_display = pred_df_display.rename(columns={"PRED_NEXT_QTD":"Prev Próx Mês (QTD)","LAST_QTD":"Últ. Mês QTD"})
+                st.dataframe(pred_df_display[["PRODUTO","Últ. Mês QTD","Prev Próx Mês (QTD)","TENDÊNCIA"]].reset_index(drop=True), use_container_width=True)
+            else:
+                st.info("Sem dados para previsão.")
+
+        # --- continua com tabela de vendas mais abaixo (mantido) ---
         st.markdown("### 📄 Tabela de Vendas (mais recentes primeiro)")
         tabela_vendas_exib = preparar_tabela_vendas(df_sem)
         st.dataframe(tabela_vendas_exib, use_container_width=True)
@@ -426,19 +569,15 @@ with tabs[2]:
 # ESTOQUE
 # =============================
 with tabs[3]:
-
-
     if estoque_df.empty:
         st.info("Sem dados de estoque.")
     else:
-        # cria cópia
         estoque_display = estoque_df.copy()
         estoque_display["VALOR_CUSTO_TOTAL_RAW"] = (estoque_display["Media C. UNITARIO"] * estoque_display["EM ESTOQUE"]).fillna(0)
         estoque_display["VALOR_VENDA_TOTAL_RAW"] = (estoque_display["Valor Venda Sugerido"] * estoque_display["EM ESTOQUE"]).fillna(0)
 
-        # --- GRÁFICO PIZZA ESTILOSO ---
         st.markdown("### 🥧 Distribuição de estoque — fatias com quantidade")
-        top_for_pie = estoque_display.sort_values("EM ESTOQUE", ascending=False).head(10)  # mostra até 10 categorias/produtos
+        top_for_pie = estoque_display.sort_values("EM ESTOQUE", ascending=False).head(10)
         if not top_for_pie.empty:
             fig_pie = px.pie(
                 top_for_pie,
@@ -462,7 +601,7 @@ with tabs[3]:
         else:
             st.info("Sem itens para gerar o gráfico.")
 
-        # --- TABELA CLÁSSICA (ordenada por EM ESTOQUE desc) ---
+        # tabela de estoque
         estoque_clas = estoque_display.copy()
         estoque_clas["CUSTO_UNITARIO_FMT"] = estoque_clas["Media C. UNITARIO"].map(formatar_reais_com_centavos)
         estoque_clas["VENDA_SUGERIDA_FMT"] = estoque_clas["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
@@ -488,11 +627,8 @@ with tabs[3]:
         st.dataframe(display_df, use_container_width=True)
 
 # =============================
-# PESQUISAR (sensível equilibrado)
+# PESQUISAR (sensível equilibrado) — sem libs externas
 # =============================
-import unicodedata
-import difflib
-
 def normalizar(texto):
     if not isinstance(texto, str):
         return ""
@@ -581,12 +717,3 @@ st.markdown("""
   <em>Nota:</em> Valores de estoque (custo & venda) são calculados a partir das colunas <strong>Media C. UNITARIO</strong>, <strong>Valor Venda Sugerido</strong> e <strong>EM ESTOQUE</strong> — estes indicadores não são afetados pelo filtro de mês.
 </div>
 """, unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
