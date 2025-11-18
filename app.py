@@ -491,12 +491,11 @@ with tabs[3]:
 # PESQUISAR
 # =============================
 import unicodedata
-from rapidfuzz import fuzz, process
+import difflib
 
 def normalizar(texto):
     if not isinstance(texto, str):
         return ""
-    # remove acentos e deixa tudo minúsculo
     texto = unicodedata.normalize("NFD", texto)
     texto = texto.encode("ascii", "ignore").decode("utf-8")
     return texto.lower()
@@ -504,7 +503,10 @@ def normalizar(texto):
 with tabs[4]:
     st.subheader("Pesquisar produtos")
 
-    termo = st.text_input("Digite parte do nome do produto", placeholder="Ex: cabo usb, fonte, fan, headset...")
+    termo = st.text_input(
+        "Digite parte do nome do produto",
+        placeholder="Ex: cabo usb, fonte, fan, headset..."
+    )
 
     if termo.strip():
         if estoque_df.empty:
@@ -515,30 +517,24 @@ with tabs[4]:
             # cria coluna normalizada temporária
             estoque_df["_search"] = estoque_df["PRODUTO"].apply(normalizar)
 
-            # busca aproximada por similaridade
             resultados = []
             for i, row in estoque_df.iterrows():
-                score = fuzz.partial_ratio(termo_norm, row["_search"])
-                if score >= 60:   # sensibilidade: quanto menor, mais permissivo
+                score = difflib.SequenceMatcher(None, termo_norm, row["_search"]).ratio()
+                if score >= 0.45:  # sensibilidade (0.0 = muito livre / 1.0 = igual)
                     resultados.append((i, score))
 
             if not resultados:
                 st.warning("Nenhum produto encontrado.")
             else:
-                # ordena pelos mais parecidos primeiro
                 resultados = sorted(resultados, key=lambda x: x[1], reverse=True)
                 df_search = estoque_df.loc[[i for i, s in resultados]].copy()
 
-                # remove coluna temporária
                 df_search.drop(columns=["_search"], inplace=True)
 
-                # formata valores
+                # formata dinheiro caso tenha
                 if "Media C. UNITARIO" in df_search.columns:
-                    df_search["Media C. UNITARIO"] = df_search["Media C. UNITARIO"].map(formatar_reais_com_centavos)
-                if "Valor Venda Sugerido" in df_search.columns:
-                    df_search["Valor Venda Sugerido"] = df_search["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+                    df_search["Media C. UNITARIO"] = df_search["Media C. UNITARIO"].m
 
-                st.dataframe(df_search.reset_index(drop=True), use_container_width=True)
 
 # =============================
 # Rodapé simples
