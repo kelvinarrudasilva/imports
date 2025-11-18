@@ -514,29 +514,32 @@ with tabs[4]:
         else:
             termo_norm = normalizar(termo)
 
-            # cria coluna normalizada temporária
             estoque_df["_search"] = estoque_df["PRODUTO"].apply(normalizar)
 
             resultados = []
             for i, row in estoque_df.iterrows():
                 score = difflib.SequenceMatcher(None, termo_norm, row["_search"]).ratio()
-                if score >= 0.45:  # sensibilidade (0.0 = muito livre / 1.0 = igual)
+                if score >= 0.45:
                     resultados.append((i, score))
 
             if not resultados:
                 st.warning("Nenhum produto encontrado.")
             else:
+                # ordena pelos mais semelhantes
                 resultados = sorted(resultados, key=lambda x: x[1], reverse=True)
-                df_search = estoque_df.loc[[i for i, s in resultados]].copy()
 
+                df_search = estoque_df.loc[[i for i, s in resultados]].copy()
                 df_search.drop(columns=["_search"], inplace=True)
 
-           # formata dinheiro caso tenha
-if "Media C. UNITARIO" in df_search.columns:
-    df_search["Media C. UNITARIO"] = df_search["Media C. UNITARIO"].map(formatar_reais_com_centavos)
+                # formatação NÃO pode ficar fora desse bloco
+                if "Media C. UNITARIO" in df_search.columns:
+                    df_search["Media C. UNITARIO"] = df_search["Media C. UNITARIO"].map(formatar_reais_com_centavos)
 
-if "Valor Venda Sugerido" in df_search.columns:
-    df_search["Valor Venda Sugerido"] = df_search["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+                if "Valor Venda Sugerido" in df_search.columns:
+                    df_search["Valor Venda Sugerido"] = df_search["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+
+                st.dataframe(df_search.reset_index(drop=True), use_container_width=True)
+
 
 
 
@@ -548,6 +551,7 @@ st.markdown("""
   <em>Nota:</em> Valores de estoque (custo & venda) são calculados a partir das colunas <strong>Media C. UNITARIO</strong>, <strong>Valor Venda Sugerido</strong> e <strong>EM ESTOQUE</strong> — estes indicadores não são afetados pelo filtro de mês.
 </div>
 """, unsafe_allow_html=True)
+
 
 
 
