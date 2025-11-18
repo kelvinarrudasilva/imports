@@ -1,5 +1,5 @@
 # ================================================
-# app.py – DASHBOARD FINAL COMPLETO (Roxo Minimalista)
+# app.py – DASHBOARD FINAL (Roxo Minimalista)
 # Loja Importados – Vendas / Compras / Estoque
 # ================================================
 
@@ -11,18 +11,16 @@ from datetime import datetime
 import requests
 from io import BytesIO
 
-
-# --------------------------
-# CONFIGURAÇÃO DO APP
-# --------------------------
+# ------------------------------------------------
+# CONFIG DO APP
+# ------------------------------------------------
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
-
-# --------------------------
-# CSS – THEMA DARK ROXO
-# --------------------------
+# ------------------------------------------------
+# CSS DARK LINDO
+# ------------------------------------------------
 st.markdown("""
 <style>
 :root{
@@ -46,14 +44,12 @@ h1,h2,h3,h4 { color: var(--accent2) !important; }
 .dataframe tbody tr td{
   color:white !important;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
-
-# --------------------------
-# FUNÇÕES AUXILIARES
-# --------------------------
+# ------------------------------------------------
+# FUNÇÕES
+# ------------------------------------------------
 def limpar_moeda(x):
     if pd.isna(x): return 0
     s=str(x).replace("R$","").replace(".","").replace(",",".")
@@ -72,328 +68,275 @@ def baixar_arquivo():
     r.raise_for_status()
     return pd.ExcelFile(BytesIO(r.content))
 
-
-# --------------------------
+# ------------------------------------------------
 # CARREGAR PLANILHA
-# --------------------------
+# ------------------------------------------------
 try:
     xls = baixar_arquivo()
 except:
-    st.error("Erro ao carregar a planilha.")
+    st.error("Erro ao carregar planilha.")
     st.stop()
 
 dfs = {}
 for aba in ["VENDAS","COMPRAS","ESTOQUE"]:
     if aba in xls.sheet_names:
-        df = pd.read_excel(xls, aba)
-        dfs[aba] = df.copy()
+        dfs[aba] = pd.read_excel(xls, aba)
 
-
-# =====================================================
-#        TRATAMENTO DE VENDAS — 100% AUTOMÁTICO
-# =====================================================
+# ------------------------------------------------
+# TRATAMENTO VENDAS (ROBUSTO)
+# ------------------------------------------------
 if "VENDAS" in dfs:
     vendas = dfs["VENDAS"].copy()
 
-    # 1. Detectar automaticamente coluna de DATA
+    # DETECTA COLUNA DATA POR NOME OU POR TIPO
     col_data = None
-
     for c in vendas.columns:
-        nome = c.upper().replace(" ", "")
-        if any(x in nome for x in ["DATA","DIA","DT","DATE"]):
+        if any(x in c.upper() for x in ["DATA","DIA","DT","DATE"]):
             col_data = c
             break
 
     if col_data is None:
         for c in vendas.columns:
             try:
-                teste = pd.to_datetime(vendas[c].head(10), errors="ignore")
-                if any(isinstance(x, (datetime, pd.Timestamp)) for x in teste):
+                tmp = pd.to_datetime(vendas[c], errors="ignore")
+                if any(isinstance(v, (datetime, pd.Timestamp)) for v in tmp):
                     col_data = c
                     break
             except:
                 pass
 
     if col_data is None:
-        st.error(f"❌ Não encontrei coluna de data.\nColunas da aba VENDAS: {list(vendas.columns)}")
+        st.error(f"Não encontrei coluna com data. Colunas: {list(vendas.columns)}")
         st.stop()
 
-    vendas = vendas.rename(columns={col_data: "DATA"})
+    vendas = vendas.rename(columns={col_data:"DATA"})
     vendas["DATA"] = pd.to_datetime(vendas["DATA"], errors="coerce")
 
-
-    # 2. Valor total
+    # VALOR TOTAL
     col_total = None
     for c in vendas.columns:
         if "TOTAL" in c.upper():
             col_total = c
+            break
 
     if col_total:
         vendas["VALOR TOTAL"] = vendas[col_total].map(limpar_moeda)
 
-
-    # 3. Valor venda
+    # VALOR VENDA
     col_venda = None
     for c in vendas.columns:
         if "VENDA" in c.upper():
             col_venda = c
+            break
 
     if col_venda:
         vendas["VALOR VENDA"] = vendas[col_venda].map(limpar_moeda)
 
-
-    # 4. QTD
+    # QTD
     col_qtd = None
     for c in vendas.columns:
-        nome = c.upper().replace(" ", "")
-        if "QTD" in nome or "QUANT" in nome:
+        if "QTD" in c.upper() or "QUANT" in c.upper():
             col_qtd = c
             break
 
-    if col_qtd:
-        vendas["QTD"] = vendas[col_qtd].fillna(0).astype(float).astype(int)
-    else:
-        vendas["QTD"] = 0
+    vendas["QTD"] = vendas[col_qtd].fillna(0).astype(int) if col_qtd else 0
 
-
-    # 5. Calcular valor total se não existir
-    if "VALOR TOTAL" not in vendas.columns and "VALOR VENDA" in vendas.columns:
+    # calcula total se não tem
+    if "VALOR TOTAL" not in vendas:
         vendas["VALOR TOTAL"] = vendas["VALOR VENDA"] * vendas["QTD"]
 
-
-    # 6. Criar MES_ANO
     vendas["MES_ANO"] = vendas["DATA"].dt.strftime("%Y-%m")
-
 else:
     vendas = pd.DataFrame()
 
-
-# =====================================================
-#            TRATAMENTO COMPRAS
-# =====================================================
+# ------------------------------------------------
+# TRATAMENTO COMPRAS (ROBUSTO)
+# ------------------------------------------------
 if "COMPRAS" in dfs:
     compras = dfs["COMPRAS"].copy()
 
-    # detectar DATA
+    # DATA
     col_data = None
     for c in compras.columns:
-        nome = c.upper().replace(" ", "")
-        if any(x in nome for x in ["DATA","DIA","DT"]):
+        if any(x in c.upper() for x in ["DATA","DIA","DT"]):
             col_data = c
             break
 
     if col_data:
-        compras = compras.rename(columns={col_data: "DATA"})
+        compras = compras.rename(columns={col_data:"DATA"})
         compras["DATA"] = pd.to_datetime(compras["DATA"], errors="coerce")
 
-    # custo unitário
+    # DETECTAR CUSTO UNITÁRIO
     col_custo = None
     for c in compras.columns:
-        if "CUSTO" in c.upper() and "UNIT" in c.upper():
+        nome = c.upper().replace(" ","")
+        if any(x in nome for x in ["CUSTO","UNIT","PRECO","VALOR"]):
             col_custo = c
+            break
 
     if col_custo:
-        compras["CUSTO UNITARIO"] = compras[col_custo].map(limpar_moeda)
+        compras["CUSTO_UNIT"] = compras[col_custo].map(limpar_moeda)
+    else:
+        compras["CUSTO_UNIT"] = 0
 
-    # quantidade
+    # QUANTIDADE
     col_qtd = None
     for c in compras.columns:
         if "QTD" in c.upper() or "QUANT" in c.upper():
             col_qtd = c
+            break
 
-    if col_qtd:
-        compras["QUANTIDADE"] = compras[col_qtd].fillna(0).astype(int)
-    else:
-        compras["QUANTIDADE"] = 0
+    compras["QUANTIDADE"] = compras[col_qtd].fillna(0).astype(int) if col_qtd else 0
 
-    compras["CUSTO TOTAL"] = compras["CUSTO UNITARIO"] * compras["QUANTIDADE"]
-    compras["MES_ANO"] = compras["DATA"].dt.strftime("%Y-%m")
+    compras["CUSTO TOTAL"] = compras["CUSTO_UNIT"] * compras["QUANTIDADE"]
+    compras["MES_ANO"] = compras["DATA"].dt.strftime("%Y-%m") if "DATA" in compras else "N/A"
 
 else:
     compras = pd.DataFrame()
 
-
-# =====================================================
-#            TRATAMENTO ESTOQUE
-# =====================================================
+# ------------------------------------------------
+# TRATAMENTO ESTOQUE
+# ------------------------------------------------
 if "ESTOQUE" in dfs:
     estoque = dfs["ESTOQUE"].copy()
 
+    # custo
     col_custo = None
     for c in estoque.columns:
         if "CUSTO" in c.upper():
             col_custo = c
-    if col_custo:
-        estoque["CUSTO UNIT"] = estoque[col_custo].map(limpar_moeda)
+            break
+    estoque["CUSTO_UNIT"] = estoque[col_custo].map(limpar_moeda) if col_custo else 0
 
+    # venda
     col_venda = None
     for c in estoque.columns:
         if "VENDA" in c.upper():
             col_venda = c
-    if col_venda:
-        estoque["PRECO VENDA"] = estoque[col_venda].map(limpar_moeda)
+            break
+    estoque["PRECO_VENDA"] = estoque[col_venda].map(limpar_moeda) if col_venda else 0
 
+    # estoque
     col_qtd = None
     for c in estoque.columns:
-        if "ESTOQUE" in c.upper() or "QTD" in c.upper():
+        if any(x in c.upper() for x in ["ESTOQUE","QTD","QUANT"]):
             col_qtd = c
+            break
+    estoque["EM_ESTOQUE"] = estoque[col_qtd].fillna(0).astype(int) if col_qtd else 0
 
-    estoque["EM ESTOQUE"] = estoque[col_qtd].fillna(0).astype(int) if col_qtd else 0
-
-    estoque["VALOR TOTAL CUSTO"] = estoque["CUSTO UNIT"] * estoque["EM ESTOQUE"]
-    estoque["VALOR TOTAL VENDA"] = estoque["PRECO VENDA"] * estoque["EM ESTOQUE"]
-
+    estoque["VALOR_CUSTO_TOTAL"] = estoque["CUSTO_UNIT"] * estoque["EM_ESTOQUE"]
+    estoque["VALOR_VENDA_TOTAL"] = estoque["PRECO_VENDA"] * estoque["EM_ESTOQUE"]
 else:
     estoque = pd.DataFrame()
 
-
-# =====================================================
-#                FILTRO MENSAL
-# =====================================================
+# ------------------------------------------------
+# FILTRO MENSAL
+# ------------------------------------------------
 meses = ["Todos"]
 if not vendas.empty:
-    meses += sorted(vendas["MES_ANO"].dropna().unique().tolist(), reverse=True)
+    meses += sorted(vendas["MES_ANO"].dropna().unique(), reverse=True)
 
-mes_atual = datetime.now().strftime("%Y-%m")
-idx_padrao = meses.index(mes_atual) if mes_atual in meses else 0
+mes_padrao = datetime.now().strftime("%Y-%m")
+idx = meses.index(mes_padrao) if mes_padrao in meses else 0
 
-mes_escolhido = st.selectbox("Filtrar por mês:", meses, index=idx_padrao)
+mes = st.selectbox("Filtrar por mês:", meses, index=idx)
 
 def filtrar(df):
-    if df.empty: return df
-    if mes_escolhido == "Todos": return df
-    return df[df["MES_ANO"] == mes_escolhido]
-
+    if df.empty or mes == "Todos": return df
+    return df[df["MES_ANO"] == mes]
 
 vendas_f = filtrar(vendas)
 compras_f = filtrar(compras)
 
+# ------------------------------------------------
+# KPIs
+# ------------------------------------------------
+kpi_vendas = vendas_f["VALOR TOTAL"].sum()
+kpi_qtd = vendas_f["QTD"].sum()
+kpi_compras = compras_f["CUSTO TOTAL"].sum()
+kpi_est_venda = estoque["VALOR_VENDA_TOTAL"].sum()
+kpi_est_custo = estoque["VALOR_CUSTO_TOTAL"].sum()
 
-# =====================================================
-#                KPIs GERAIS
-# =====================================================
-total_vendas = vendas_f["VALOR TOTAL"].sum() if not vendas_f.empty else 0
-total_qtd = vendas_f["QTD"].sum() if not vendas_f.empty else 0
-total_compras = compras_f["CUSTO TOTAL"].sum() if not compras_f.empty else 0
-valor_estoque = estoque["VALOR TOTAL VENDA"].sum() if not estoque.empty else 0
-custo_estoque = estoque["VALOR TOTAL CUSTO"].sum() if not estoque.empty else 0
+col1,col2,col3,col4,col5 = st.columns(5)
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1.markdown(f"<div class='kpi-box'><h4>💵 Vendas</h4><h2>{formatar(kpi_vendas)}</h2></div>", unsafe_allow_html=True)
+col2.markdown(f"<div class='kpi-box'><h4>📦 Itens Vendidos</h4><h2>{kpi_qtd}</h2></div>", unsafe_allow_html=True)
+col3.markdown(f"<div class='kpi-box'><h4>💸 Compras</h4><h2>{formatar(kpi_compras)}</h2></div>", unsafe_allow_html=True)
+col4.markdown(f"<div class='kpi-box'><h4>🏷 Estoque (Venda)</h4><h2>{formatar(kpi_est_venda)}</h2></div>", unsafe_allow_html=True)
+col5.markdown(f"<div class='kpi-box'><h4>📥 Estoque (Custo)</h4><h2>{formatar(kpi_est_custo)}</h2></div>", unsafe_allow_html=True)
 
-col1.markdown(f"<div class='kpi-box'><h4>💵 Vendas</h4><h2>{formatar(total_vendas)}</h2></div>", unsafe_allow_html=True)
-col2.markdown(f"<div class='kpi-box'><h4>📦 Itens vendidos</h4><h2>{total_qtd}</h2></div>", unsafe_allow_html=True)
-col3.markdown(f"<div class='kpi-box'><h4>💸 Compras</h4><h2>{formatar(total_compras)}</h2></div>", unsafe_allow_html=True)
-col4.markdown(f"<div class='kpi-box'><h4>🏷 Estoque (Venda)</h4><h2>{formatar(valor_estoque)}</h2></div>", unsafe_allow_html=True)
-col5.markdown(f"<div class='kpi-box'><h4>📥 Estoque (Custo)</h4><h2>{formatar(custo_estoque)}</h2></div>", unsafe_allow_html=True)
+# ------------------------------------------------
+# ABAS
+# ------------------------------------------------
+aba1,aba2,aba3,aba4=st.tabs(["🛒 VENDAS","💸 COMPRAS","📦 ESTOQUE","🔍 PESQUISAR"])
 
-
-# =====================================================
-#                ABAS PRINCIPAIS
-# =====================================================
-aba1, aba2, aba3, aba4 = st.tabs(["🛒 VENDAS", "💸 COMPRAS", "📦 ESTOQUE", "🔍 PESQUISAR"])
-
-
-# -----------------------
-# ABA VENDAS
-# -----------------------
+# ---------------- VENDAS ----------------
 with aba1:
-    st.subheader("📊 Vendas — período selecionado")
-
+    st.subheader("📊 Vendas do período")
     if vendas_f.empty:
-        st.info("Nenhuma venda encontrada.")
+        st.info("Nenhuma venda.")
     else:
-        df = vendas_f.copy()
-
         fig = px.bar(
-            df.sort_values("DATA"),
-            x="DATA",
-            y="VALOR TOTAL",
-            text=df["VALOR TOTAL"].apply(formatar),
+            vendas_f.sort_values("DATA"),
+            x="DATA", y="VALOR TOTAL",
+            text=vendas_f["VALOR TOTAL"].apply(formatar),
             color_discrete_sequence=["#8b5cf6"],
             height=380
         )
         fig.update_traces(textposition="inside")
         fig.update_layout(plot_bgcolor="#0b0b0b", paper_bgcolor="#0b0b0b")
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("📄 Tabela de Vendas")
-        st.dataframe(df.sort_values("DATA", ascending=False), use_container_width=True)
+        st.subheader("Tabela de Vendas")
+        st.dataframe(vendas_f.sort_values("DATA", ascending=False), use_container_width=True)
 
-
-# -----------------------
-# ABA COMPRAS
-# -----------------------
+# ---------------- COMPRAS ----------------
 with aba2:
-    st.subheader("💸 Compras — período selecionado")
-
+    st.subheader("💸 Compras do período")
     if compras_f.empty:
-        st.info("Nenhuma compra encontrada.")
+        st.info("Nenhuma compra.")
     else:
-        df = compras_f.copy()
-
         fig = px.bar(
-            df.sort_values("DATA"),
-            x="DATA",
-            y="CUSTO TOTAL",
-            text=df["CUSTO TOTAL"].apply(formatar),
+            compras_f.sort_values("DATA"),
+            x="DATA", y="CUSTO TOTAL",
+            text=compras_f["CUSTO TOTAL"].apply(formatar),
             color_discrete_sequence=["#8b5cf6"],
             height=380
         )
         fig.update_traces(textposition="inside")
         fig.update_layout(plot_bgcolor="#0b0b0b", paper_bgcolor="#0b0b0b")
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("📄 Tabela de Compras")
-        st.dataframe(df.sort_values("DATA", ascending=False), use_container_width=True)
+        st.subheader("Tabela de Compras")
+        st.dataframe(compras_f.sort_values("DATA", ascending=False), use_container_width=True)
 
-
-# -----------------------
-# ABA ESTOQUE
-# -----------------------
+# ---------------- ESTOQUE ----------------
 with aba3:
     st.subheader("📦 Estoque Atual")
-
     if estoque.empty:
-        st.info("Nenhum item encontrado.")
+        st.info("Nenhum item.")
     else:
-        df = estoque.copy().sort_values("EM ESTOQUE", ascending=False)
+        df = estoque.sort_values("EM_ESTOQUE", ascending=False)
 
         fig = px.bar(
             df.head(25),
-            x="PRODUTO",
-            y="EM ESTOQUE",
-            text="EM ESTOQUE",
+            x="PRODUTO", y="EM_ESTOQUE",
+            text="EM_ESTOQUE",
             color_discrete_sequence=["#8b5cf6"],
             height=380
         )
         fig.update_traces(textposition="inside")
         fig.update_layout(plot_bgcolor="#0b0b0b", paper_bgcolor="#0b0b0b")
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("📄 Tabela completa")
         st.dataframe(df, use_container_width=True)
 
-
-# -----------------------
-# ABA PESQUISAR
-# -----------------------
+# ---------------- PESQUISAR ----------------
 with aba4:
-    st.subheader("🔍 Buscar produto no estoque")
-
-    termo = st.text_input("Digite parte do nome:")
-
-    if termo.strip():
-        df = (
-            estoque[
-                estoque["PRODUTO"]
-                .astype(str)
-                .str.contains(termo, case=False, na=False)
-            ]
-            if "PRODUTO" in estoque.columns
-            else pd.DataFrame()
-        )
-
+    termo = st.text_input("Buscar produto:")
+    if termo:
+        df = estoque[estoque["PRODUTO"].astype(str).str.contains(termo, case=False, na=False)]
         if df.empty:
-            st.warning("Nenhum produto encontrado.")
+            st.warning("Nenhum item encontrado.")
         else:
             st.dataframe(df.reset_index(drop=True), use_container_width=True)
