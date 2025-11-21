@@ -162,20 +162,54 @@ def limpar_aba_raw(df_raw,nome):
     return df.reset_index(drop=True)
 
 def preparar_tabela_vendas(df):
-    if df is None or df.empty: return pd.DataFrame()
-    d=df.copy()
-    if "DATA" in d.columns: d["DATA"]=d["DATA"].dt.strftime("%d/%m/%Y")
-    for c in ["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO","QTD"]:
-        if c not in d.columns: d[c]=0
-    d=formatar_colunas_moeda(d,["VALOR VENDA","VALOR TOTAL","MEDIA CUSTO UNITARIO","LUCRO UNITARIO"])
-    d=d.loc[:,~d.columns.astype(str).str.contains("^Unnamed|MES_ANO")]
-    # garantir ordenação: mais recente primeiro (se houver DATA convertida)
+    if df is None or df.empty: 
+        return pd.DataFrame()
+
+    d = df.copy()
+
+    # DATA
+    if "DATA" in d.columns:
+        d["DATA"] = d["DATA"].dt.strftime("%d/%m/%Y")
+
+    # Criar colunas caso não existam
+    for c in ["VALOR VENDA", "VALOR TOTAL", "MEDIA CUSTO UNITARIO", "LUCRO UNITARIO", "QTD"]:
+        if c not in d.columns:
+            d[c] = 0
+
+    # FORMATAR MOEDAS COM CENTAVOS
+    try:
+        d["VALOR VENDA"] = d["VALOR VENDA"].astype(float)
+    except:
+        pass
+    try:
+        d["VALOR TOTAL"] = d["VALOR TOTAL"].astype(float)
+    except:
+        pass
+    try:
+        d["MEDIA CUSTO UNITARIO"] = d["MEDIA CUSTO UNITARIO"].astype(float)
+    except:
+        pass
+    try:
+        d["LUCRO UNITARIO"] = d["LUCRO UNITARIO"].astype(float)
+    except:
+        pass
+
+    d["VALOR VENDA"] = d["VALOR VENDA"].map(formatar_reais_com_centavos)
+    d["VALOR TOTAL"] = d["VALOR TOTAL"].map(formatar_reais_com_centavos)
+    d["MEDIA CUSTO UNITARIO"] = d["MEDIA CUSTO UNITARIO"].map(formatar_reais_com_centavos)
+    d["LUCRO UNITARIO"] = d["LUCRO UNITARIO"].map(formatar_reais_com_centavos)
+
+    # Remover colunas lixo
+    d = d.loc[:, ~d.columns.astype(str).str.contains("^Unnamed|MES_ANO")]
+
+    # Ordenação: mais recente primeiro
     if "DATA" in d.columns:
         try:
-            d["_sort"] = pd.to_datetime(d["DATA"].str.replace("/","-"), format="%d-%m-%Y", errors="coerce")
+            d["_sort"] = pd.to_datetime(d["DATA"], format="%d/%m/%Y", errors="coerce")
             d = d.sort_values("_sort", ascending=False).drop(columns=["_sort"])
         except:
             pass
+
     return d
 
 def plotly_dark_config(fig):
@@ -372,7 +406,8 @@ with tabs[0]:
         df_sem_group = df_sem.groupby(["ANO","SEMANA"], dropna=False)["VALOR TOTAL"].sum().reset_index()
         if not df_sem_group.empty:
             df_sem_group["INTERVALO"] = df_sem_group.apply(semana_intervalo, axis=1)
-            df_sem_group["LABEL"] = df_sem_group["VALOR TOTAL"].apply(formatar_reais_sem_centavos)
+            # show labels WITH cents
+            df_sem_group["LABEL"] = df_sem_group["VALOR TOTAL"].apply(formatar_reais_com_centavos)
             st.markdown("### 📊 Faturamento Semanal do Mês")
             fig_sem = px.bar(df_sem_group, x="INTERVALO", y="VALOR TOTAL", text="LABEL", color_discrete_sequence=["#8b5cf6"], height=380)
             plotly_dark_config(fig_sem)
@@ -392,14 +427,14 @@ with tabs[1]:
     else:
         dfv = vendas_filtradas.copy()
         top_val = dfv.groupby("PRODUTO", dropna=False).agg(VALOR_TOTAL=("VALOR TOTAL","sum"), QTD_TOTAL=("QTD","sum")).reset_index().sort_values("VALOR_TOTAL", ascending=False).head(10)
-        top_val["VALOR_TOTAL_LABEL"] = top_val["VALOR_TOTAL"].apply(formatar_reais_sem_centavos)
+        top_val["VALOR_TOTAL_LABEL"] = top_val["VALOR_TOTAL"].apply(formatar_reais_com_centavos)
         fig_top_val = px.bar(top_val, x="PRODUTO", y="VALOR_TOTAL", text="VALOR_TOTAL_LABEL", color_discrete_sequence=["#8b5cf6"], height=380)
         plotly_dark_config(fig_top_val)
         fig_top_val.update_traces(textposition="inside", textfont_size=12)
         st.plotly_chart(fig_top_val, use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por VALOR")
         top_val_display = top_val.copy()
-        top_val_display["VALOR_TOTAL"] = top_val_display["VALOR_TOTAL"].map(formatar_reais_sem_centavos)
+        top_val_display["VALOR_TOTAL"] = top_val_display["VALOR_TOTAL"].map(formatar_reais_com_centavos)
         st.dataframe(top_val_display[["PRODUTO","VALOR_TOTAL","QTD_TOTAL"]], use_container_width=True)
 
 # =============================
@@ -419,7 +454,7 @@ with tabs[2]:
         st.plotly_chart(fig_top_qtd, use_container_width=True, config=dict(displayModeBar=False))
         st.markdown("### 📄 Tabela Top 10 por QUANTIDADE")
         top_qtd_display = top_qtd.copy()
-        top_qtd_display["VALOR_TOTAL"] = top_qtd_display["VALOR_TOTAL"].map(formatar_reais_sem_centavos)
+        top_qtd_display["VALOR_TOTAL"] = top_qtd_display["VALOR_TOTAL"].map(formatar_reais_com_centavos)
         st.dataframe(top_qtd_display[["PRODUTO","QTD_TOTAL","VALOR_TOTAL"]], use_container_width=True)
 
 # =============================
