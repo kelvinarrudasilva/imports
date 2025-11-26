@@ -495,12 +495,14 @@ with tabs[1]:
 
 
 
+
+
 # =============================
-# PESQUISAR (MODERNIZADA — MARGEM REMOVIDA)
+# PESQUISAR (MODERNIZADA — SEM MARGEM)
 # =============================
 with tabs[2]:
 
-    # local CSS para pesquisa (2 colunas no PC, 1 no mobile)
+    # CSS exclusivo da aba PESQUISAR
     st.markdown("""
     <style>
     .card-grid {
@@ -512,27 +514,62 @@ with tabs[2]:
     @media (max-width: 800px) {
         .card-grid { grid-template-columns: 1fr; }
     }
+
     .search-card {
-        background:#141414;
+        background:#141414 !important;
         padding:16px;
         border-radius:12px;
-        border:1px solid rgba(255,255,255,0.03);
-        box-shadow:0 6px 18px rgba(0,0,0,0.5);
+        border:1px solid rgba(255,255,255,0.06);
+        color:#f0f0f0 !important;
+        box-shadow:0 6px 18px rgba(0,0,0,0.55);
         transition: transform .12s ease;
     }
-    .search-card:hover { transform: translateY(-6px); border-color: rgba(167,139,250,0.12); }
-    .search-title { color:#a78bfa; font-weight:800; font-size:15px; margin-bottom:6px; }
-    .meta { color:#bdbdbd; font-size:13px; margin-top:8px; line-height:1.4; }
-    .badge { display:inline-block; padding:4px 8px; border-radius:8px; font-size:12px; margin-right:6px; background:#222; border:1px solid #333; color:#eee; }
+    .search-card:hover { 
+        transform: translateY(-6px); 
+        border-color: rgba(167,139,250,0.2); 
+    }
+
+    .search-title { 
+        color:#a78bfa !important; 
+        font-weight:800; 
+        font-size:15px; 
+        margin-bottom:6px; 
+    }
+
+    .meta { 
+        color:#d4d4d4 !important; 
+        font-size:13px; 
+        margin-top:8px; 
+        line-height:1.4; 
+    }
+
+    /* BADGES */
+    .badge { 
+        display:inline-block; 
+        padding:4px 8px; 
+        border-radius:8px; 
+        font-size:12px; 
+        margin-right:6px; 
+        background:#222; 
+        border:1px solid #333; 
+        color:#eee !important; 
+    }
     .low { background:#4b0000; border-color:#ff6b6b; }
     .hot { background:#2b0030; border-color:#c77dff; }
-    .zero { background:#2f2f2f; border-color:#666; }
+    .zero { background:#2f2f2f; border-color:#777; }
+
+    /* input e textos brancos */
+    label, .stTextInput label, .stSelectbox label, .stCheckbox label {
+        color:#eaeaea !important;
+        font-weight:600;
+    }
+
     </style>
     """, unsafe_allow_html=True)
 
     st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
 
-    # Controls: search + clear
+    # Campo de busca + limpar
     col_s1, col_s2 = st.columns([3,1])
     with col_s1:
         termo = st.text_input("Procurar produto", placeholder="Digite o nome ou parte dele...")
@@ -540,33 +577,31 @@ with tabs[2]:
         limpar = st.button("Limpar")
 
     if limpar:
-        st.experimental_set_query_params()
         termo = ""
+        st.experimental_set_query_params()
 
-    # Quick filters
-    f1, f2, f3 = st.columns(3)
+    # Filtros rápidos (agora com ❄️ Sem vendas integrado)
+    f1, f2, f3, f4 = st.columns(4)
     filtro_baixo = f1.checkbox("⚠️ Estoque baixo (≤ 3)")
     filtro_alto = f2.checkbox("📦 Estoque alto (≥ 20)")
     filtro_vendidos = f3.checkbox("🔥 Com vendas")
-
-    # -----------------------------------------------------
-    # 🔵 Botão adicional "❄️ Sem vendas" (NOVO)
-    # -----------------------------------------------------
-    botao_sem_vendas = st.button("❄️ Sem vendas")
+    filtro_sem_vendas = f4.checkbox("❄️ Sem vendas")   # NOVO — estilo igual
 
     # Ordenar e paginação
     ordenar = st.selectbox("Ordenar por:", ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"])
+
     colp1, colp2 = st.columns([1,1])
     per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=1)
     page = colp2.number_input("Página", min_value=1, value=1, step=1)
 
-    # Fonte de dados
+    # Fonte
     df_src = estoque_df.copy() if not estoque_df.empty else pd.DataFrame()
 
     if df_src.empty:
         st.info("Nenhum dado de estoque disponível.")
     else:
-        # vendas agregadas para filtro 'com vendas'
+
+        # vendas agregadas
         vendas_df = dfs.get("VENDAS", pd.DataFrame()).copy()
         if not vendas_df.empty and "QTD" in vendas_df.columns:
             vendas_agregado = vendas_df.groupby("PRODUTO", dropna=False)["QTD"].sum().reset_index().rename(columns={"QTD":"TOTAL_QTD"})
@@ -575,40 +610,39 @@ with tabs[2]:
 
         df = df_src.merge(vendas_agregado, how="left", on="PRODUTO").fillna({"TOTAL_QTD":0})
 
-        # busca por termo
+        # Busca
         if termo and termo.strip():
-            df = df[df["PRODUTO"].str.contains(termo.strip(), case=False, na=False)].copy()
+            df = df[df["PRODUTO"].str.contains(termo.strip(), case=False, na=False)]
 
-        # filtros
+        # Aplicar filtros
         if filtro_baixo:
             df = df[df["EM ESTOQUE"] <= 3]
+
         if filtro_alto:
             df = df[df["EM ESTOQUE"] >= 20]
+
         if filtro_vendidos:
             df = df[df["TOTAL_QTD"] > 0]
 
-        # -----------------------------------------------------
-        # AÇÃO DO BOTÃO "❄️ Sem vendas"
-        # -----------------------------------------------------
-        if botao_sem_vendas:
+        if filtro_sem_vendas:      # NOVO — funcionando!
             df = df[df["TOTAL_QTD"] == 0]
 
-        # preparar campos para exibição
+        # Preparar campos
         df["CUSTO_FMT"] = df["Media C. UNITARIO"].fillna(0).map(formatar_reais_com_centavos)
         df["VENDA_FMT"] = df["Valor Venda Sugerido"].fillna(0).map(formatar_reais_com_centavos)
-        df["TOTAL_QTD"] = df["TOTAL_QTD"].fillna(0).astype(int)
+        df["TOTAL_QTD"] = df["TOTAL_QTD"].astype(int)
 
-        # ordenar
+        # Ordenações
         if ordenar == "Nome A–Z":
             df = df.sort_values("PRODUTO", ascending=True)
         elif ordenar == "Estoque (maior→menor)":
             df = df.sort_values("EM ESTOQUE", ascending=False)
         elif ordenar == "Preço (maior→menor)":
             df = df.sort_values("Valor Venda Sugerido", ascending=False)
-        else:
+        else:  # Relevância
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        # paginação
+        # Paginação
         total_items = len(df)
         total_pages = max(1, (total_items + per_page - 1)//per_page)
         page = min(max(1, int(page)), total_pages)
@@ -622,11 +656,12 @@ with tabs[2]:
         else:
             st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
             for _, r in df_page.iterrows():
-                nome = r.get("PRODUTO","-")
-                estoque = int(r.get("EM ESTOQUE",0))
-                custo = r.get("CUSTO_FMT","R$ 0,00")
-                venda = r.get("VENDA_FMT","R$ 0,00")
-                vendidos = int(r.get("TOTAL_QTD",0))
+
+                nome = r["PRODUTO"]
+                estoque = int(r["EM ESTOQUE"])
+                custo = r["CUSTO_FMT"]
+                venda = r["VENDA_FMT"]
+                vendidos = int(r["TOTAL_QTD"])
 
                 badges = []
                 if estoque <= 3:
@@ -639,7 +674,8 @@ with tabs[2]:
                 st.markdown(f"""
                 <div class='search-card'>
                     <div class='search-title'>{nome}</div>
-                    <div>{' '.join(badges)}</div>
+                    <div>{" ".join(badges)}</div>
+
                     <div class='meta'>
                         Estoque: <b>{estoque}</b><br>
                         Preço: <b>{venda}</b><br>
@@ -648,8 +684,10 @@ with tabs[2]:
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
             st.markdown("</div>", unsafe_allow_html=True)
 
+        # CSV export
         csv = df_page[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
             "Valor Venda Sugerido":"PRECO_VENDA",
             "Media C. UNITARIO":"CUSTO_UNITARIO",
