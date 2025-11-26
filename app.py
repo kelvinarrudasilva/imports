@@ -499,162 +499,100 @@ with tabs[1]:
 # =============================
 # PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
 # =============================
-
 with tabs[2]:
 
-    # =============================
-    # PESQUISAR — VISUAL REFEITO (ALTO CONTRASTE / E‑COMMERCE / SEM PAGINAÇÃO)
-    # =============================
-
+    # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno
     st.markdown("""
     <style>
-    /* Container around the search area */
-    .buscar-wrap{
-        background: linear-gradient(180deg, rgba(27,27,27,0.98), rgba(20,20,20,0.98));
-        border-radius:14px;
-        padding:24px;
-        border:1px solid rgba(255,255,255,0.04);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-        margin-top:10px;
+    .card-grid {
+        display:grid;
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
+        gap:18px;
+        margin-top:16px;
     }
-    .buscar-header{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:12px;
-        margin-bottom:12px;
+    @media (max-width: 800px) {
+        .card-grid { grid-template-columns: 1fr; }
     }
-    .buscar-titulo{
-        color:#f3f3f3;
-        font-weight:900;
-        font-size:18px;
+    .search-card {
+        background:#141414;
+        padding:16px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,0.08);
+        box-shadow:0 6px 18px rgba(0,0,0,0.5);
+        transition: transform .12s ease;
+        color:#eaeaea;
     }
-    .buscar-sub{
+    .search-card:hover {
+        transform: translateY(-6px);
+        border-color: rgba(167,139,250,0.28);
+    }
+    .search-title {
+        color:#a78bfa;
+        font-weight:800;
+        font-size:15px;
+        margin-bottom:6px;
+    }
+    .meta {
         color:#cfcfcf;
         font-size:13px;
+        margin-top:8px;
+        line-height:1.4;
     }
-
-    /* Input and controls */
-    .buscar-form { display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-    .buscar-input { flex:1 1 520px; }
-    .stTextInput>div>div>input, .stTextInput>div>div>textarea {
-        background: #222 !important;
-        color: #fff !important;
-        border: 1px solid #444 !important;
-        border-radius:10px !important;
-        padding:10px 14px !important;
-        font-size:15px !important;
-    }
-    .buscar-actions { display:flex; gap:8px; align-items:center; }
-
-    /* Filters row */
-    .buscar-filtros { display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
-    .buscar-filtros .stCheckbox label, .buscar-filtros .stSelectbox label {
-        color:#eaeaea !important;
-        font-weight:700 !important;
-    }
-
-    /* Buttons */
-    .stButton>button {
-        background:#8b5cf6 !important;
-        color:white !important;
-        font-weight:800 !important;
-        border-radius:10px !important;
-        padding:10px 14px !important;
-        border: none !important;
-        box-shadow:0 6px 18px rgba(139,92,246,0.12) !important;
-    }
-    .stButton>button:hover { background:#a78bfa !important; transform: translateY(-2px); }
-
-    /* Card grid */
-    .card-grid-ecom {
-        display:grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap:16px;
-        margin-top:14px;
-    }
-    @media(max-width:1200px){ .card-grid-ecom{ grid-template-columns: repeat(2, 1fr); } }
-    @media(max-width:720px){ .card-grid-ecom{ grid-template-columns: 1fr; } }
-
-    .card-ecom {
-        background: linear-gradient(180deg, rgba(24,24,24,0.9), rgba(17,17,17,0.9));
-        border-radius:12px;
-        padding:14px;
-        border:1px solid rgba(255,255,255,0.03);
-        box-shadow: 0 10px 26px rgba(0,0,0,0.45);
-        color:#eaeaea;
-        display:flex;
-        gap:12px;
-        align-items:center;
-    }
-    .card-thumb{
-        width:72px;
-        height:72px;
+    .badge {
+        display:inline-block;
+        padding:4px 8px;
         border-radius:8px;
-        background:linear-gradient(135deg, rgba(139,92,246,0.12), rgba(167,139,250,0.06));
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:800;
-        color:#fff;
-        flex-shrink:0;
+        font-size:12px;
+        margin-right:6px;
+        background:#222;
+        border:1px solid #333;
+        color:#eee;
     }
-    .card-body { flex:1; min-width:0; }
-    .card-title { font-weight:900; font-size:15px; color:#fff; margin-bottom:6px; }
-    .card-meta { font-size:13px; color:#cfcfcf; margin-bottom:6px; }
-    .card-prices { display:flex; gap:10px; align-items:center; }
-    .card-price { font-weight:900; color:#a78bfa; font-size:15px; }
-    .card-cost { font-size:13px; color:#bdbdbd; text-decoration: line-through; }
-    .card-badges { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
-
-    /* Small helper */
-    .small-muted { color:#bdbdbd; font-size:12px; }
-
+    .low  { background:#4b0000; border-color:#ff6b6b; }
+    .hot  { background:#2b0030; border-color:#c77dff; }
+    .zero { background:#2f2f2f; border-color:#666; }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div class='buscar-wrap'>", unsafe_allow_html=True)
-    st.markdown("<div class='buscar-header'><div><div class='buscar-titulo'>🔍 Buscar produtos</div><div class='buscar-sub'>Pesquise, filtre e exporte — layout otimizado para desktop</div></div><div class='small-muted'>Modo: <b>Alto Contraste</b></div></div>", unsafe_allow_html=True)
+    st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
 
-    # --- Controls row ---
-    cols = st.columns([6,1,1])
-    with cols[0]:
-        termo = st.text_input("","", placeholder="Digite parte do nome ou SKU...", key="buscar_term", help="Procure por nome ou parte do nome")
-    with cols[1]:
-        st.markdown("", unsafe_allow_html=True)
-        limpar = st.button("Limpar filtros", key="btn_limpar")
-    with cols[2]:
-        # compact / ecommerce toggles
-        compact = st.checkbox("Compacto", value=False, help="Modo compacto de cards (menos detalhes)")
-        ecommerce_mode = st.checkbox("Modo e‑commerce", value=True, help="Cards estilo loja (melhor visual)")
+    # INPUTS DE PESQUISA
+    col_s1, col_s2 = st.columns([3,1])
+    with col_s1:
+        termo = st.text_input(
+            "Procurar produto",
+            placeholder="Digite parte do nome..."
+        )
+    with col_s2:
+        limpar = st.button("Limpar")
 
     if limpar:
+        st.experimental_set_query_params()
         termo = ""
-        # reset filters via session state where plausible
-        for k in ["f_baixo","f_alto","f_vendidos","f_semvenda","ord","grid_cols"]:
-            try: st.session_state.pop(k)
-            except: pass
 
-    # filters row
-    fcols = st.columns(4)
-    filtro_baixo = fcols[0].checkbox("⚠️ Baixo estoque (≤3)", key="f_baixo")
-    filtro_alto  = fcols[1].checkbox("📦 Alto estoque (≥20)", key="f_alto")
-    filtro_vendidos = fcols[2].checkbox("🔥 Com vendas", key="f_vendidos")
-    filtro_sem_venda = fcols[3].checkbox("❄️ Sem vendas", key="f_semvenda")
+    # FILTROS
+    f1, f2, f3, f4 = st.columns(4)
+    filtro_baixo    = f1.checkbox("⚠️ Baixo estoque (≤3)")
+    filtro_alto     = f2.checkbox("📦 Alto estoque (≥20)")
+    filtro_vendidos = f3.checkbox("🔥 Com vendas")
+    filtro_sem_venda = f4.checkbox("❄️ Sem vendas")   # novo botão
 
-    ordenar = st.selectbox("Ordenar por:", ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"], index=0, key="ord")
+    ordenar = st.selectbox(
+        "Ordenar por:",
+        ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"]
+    )
 
-    # grid control
-    grid_cols = st.radio("Colunas", options=[3,2,1], index=0, horizontal=True, key="grid_cols")
+    colp1, colp2 = st.columns([1,1])
+    per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=1)
+    page     = colp2.number_input("Página", min_value=1, value=1, step=1)
 
-    # data source
+    # BASE DE DADOS
     df_src = estoque_df.copy() if not estoque_df.empty else pd.DataFrame()
 
     if df_src.empty:
         st.info("Nenhum dado de estoque disponível.")
-        st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # merge vendas
+        # agregação das vendas
         vendas_df = dfs.get("VENDAS", pd.DataFrame()).copy()
         if not vendas_df.empty and "QTD" in vendas_df.columns:
             vendas_agregado = vendas_df.groupby("PRODUTO")["QTD"].sum().reset_index().rename(columns={"QTD":"TOTAL_QTD"})
@@ -663,11 +601,11 @@ with tabs[2]:
 
         df = df_src.merge(vendas_agregado, how="left", on="PRODUTO").fillna({"TOTAL_QTD":0})
 
-        # text filter
-        if termo and termo.strip():
+        # FILTRO DE TEXTO
+        if termo.strip():
             df = df[df["PRODUTO"].str.contains(termo.strip(), case=False, na=False)]
 
-        # quick filters
+        # FILTROS QUICK
         if filtro_baixo:
             df = df[df["EM ESTOQUE"] <= 3]
         if filtro_alto:
@@ -677,13 +615,12 @@ with tabs[2]:
         if filtro_sem_venda:
             df = df[df["TOTAL_QTD"] == 0]
 
-        # formats
+        # FORMATOS
         df["CUSTO_FMT"]  = df["Media C. UNITARIO"].fillna(0).map(formatar_reais_com_centavos)
         df["VENDA_FMT"]  = df["Valor Venda Sugerido"].fillna(0).map(formatar_reais_com_centavos)
         df["TOTAL_QTD"]  = df["TOTAL_QTD"].astype(int)
-        df = df.reset_index(drop=True)
 
-        # ordering
+        # ORDENAR
         if ordenar == "Nome A–Z":
             df = df.sort_values("PRODUTO", ascending=True)
         elif ordenar == "Estoque (maior→menor)":
@@ -693,79 +630,70 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        # results count
-        st.markdown(f"**Resultados:** {len(df)} itens encontrados")
+        # PAGINAÇÃO
+        total_items = len(df)
+        total_pages = max(1, (total_items + per_page - 1)//per_page)
+        page = min(max(1, int(page)), total_pages)
+        start = (page-1)*per_page
+        df_page = df.iloc[start:start+per_page]
 
-        # dynamic grid columns
-        if grid_cols == 3:
-            col_css = 'grid-template-columns: repeat(3, 1fr);'
-        elif grid_cols == 2:
-            col_css = 'grid-template-columns: repeat(2, 1fr);'
+        st.markdown(f"**Resultados:** {total_items} itens — página {page}/{total_pages}")
+
+        if df_page.empty:
+            st.info("Nenhum produto nesta página.")
         else:
-            col_css = 'grid-template-columns: 1fr;'
+            st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
 
-        # Render cards
-        st.markdown(f"<div class='card-grid-ecom' style='{col_css}'>", unsafe_allow_html=True)
+            for _, r in df_page.iterrows():
+                nome = r["PRODUTO"]
+                estoque = int(r["EM ESTOQUE"])
+                venda   = r["VENDA_FMT"]
+                custo   = r["CUSTO_FMT"]
+                vendidos = int(r["TOTAL_QTD"])
 
-        for _, r in df.iterrows():
-            nome = r.get("PRODUTO","-")
-            estoque = int(r.get("EM ESTOQUE",0))
-            venda   = r.get("VENDA_FMT","R$ 0,00")
-            custo   = r.get("CUSTO_FMT","R$ 0,00")
-            vendidos = int(r.get("TOTAL_QTD",0))
+                # BADGES
+                badges = []
+                if estoque <= 3:
+                    badges.append("<span class='badge low'>⚠️ Baixo estoque</span>")
+                if vendidos >= 15:
+                    badges.append("<span class='badge hot'>🔥 Saindo muito</span>")
+                if vendidos == 0:
+                    badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
 
-            # badges html
-            badges = []
-            if estoque <= 3:
-                badges.append("<span class='badge low' style='background:#4b0000;padding:4px 8px;border-radius:8px;color:#fff;font-weight:700;'>⚠️ Baixo</span>")
-            if vendidos >= 15:
-                badges.append("<span class='badge hot' style='background:#3b0050;padding:4px 8px;border-radius:8px;color:#fff;font-weight:700;'>🔥 Saindo</span>")
-            if vendidos == 0:
-                badges.append("<span class='badge zero' style='background:#2f2f2f;padding:4px 8px;border-radius:8px;color:#fff;font-weight:700;'>❄️ Sem vendas</span>")
+                badges_html = " ".join(badges)
 
-            badges_html = " ".join(badges)
-
-            # compact vs ecommerce body
-            if compact:
-                html = f"""
-<div class='card-ecom'>
-  <div class='card-thumb'>{nome[:2].upper()}</div>
-  <div class='card-body'>
-    <div class='card-title'>{nome}</div>
-    <div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>
-    <div class='card-prices'><div class='card-price'>{venda}</div></div>
-  </div>
+                # CARD HTML — SEM INDENTAÇÃO
+                html_card = f"""
+<div class='search-card'>
+<div class='search-title'>{nome}</div>
+<div>{badges_html}</div>
+<div class='meta'>
+Estoque: <b>{estoque}</b><br>
+Preço: <b>{venda}</b><br>
+Custo: <b>{custo}</b><br>
+Vendidos (total): <b>{vendidos}</b>
 </div>
-"""
-            else:
-                html = f"""
-<div class='card-ecom'>
-  <div class='card-thumb'>{nome[:2].upper()}</div>
-  <div class='card-body'>
-    <div class='card-title'>{nome}</div>
-    <div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>
-    <div class='card-prices'><div class='card-price'>{venda}</div><div class='card-cost'>{custo}</div></div>
-    <div class='card-badges'>{badges_html}</div>
-  </div>
 </div>
 """
 
-            st.markdown(html, unsafe_allow_html=True)
+                st.markdown(html_card, unsafe_allow_html=True)
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        # export CSV - export filtered full df
-        csv = df[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
+        # EXPORTAÇÃO CSV
+        csv = df_page[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
             "Valor Venda Sugerido":"PRECO_VENDA",
             "Media C. UNITARIO":"CUSTO_UNITARIO",
             "TOTAL_QTD":"VENDIDOS_TOTAL"
         }).to_csv(index=False).encode("utf-8")
 
         st.download_button(
-            "📥 Exportar resultados (CSV)",
+            "📥 Exportar esta página (CSV)",
             data=csv,
-            file_name="pesquisa_completa.csv",
+            file_name=f"pesquisa_pagina_{page}.csv",
             mime="text/csv"
         )
 
-    st.markdown("</div>", unsafe_allow_html=True)
+
+
+
