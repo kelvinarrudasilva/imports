@@ -6,6 +6,19 @@ import re
 from datetime import datetime, timedelta
 import requests
 from io import BytesIO
+# ESTADOS DA ABA PESQUISAR (precisa ser ANTES dos widgets)
+for k, v in {
+    "pesq_termo": "",
+    "pesq_baixo": False,
+    "pesq_alto": False,
+    "pesq_vendidos": False,
+    "pesq_sem_venda": False,
+    "pesq_ordenar": "Relevância",
+    "pesq_per_page": 8,
+    "pesq_page": 1,
+}.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
@@ -501,15 +514,7 @@ with tabs[1]:
 # =============================
 with tabs[2]:
 
-    # **Estado inicial dos controles da aba PESQUISAR**
-    if "pesq_termo" not in st.session_state: st.session_state.pesq_termo = ""
-    if "pesq_baixo" not in st.session_state: st.session_state.pesq_baixo = False
-    if "pesq_alto" not in st.session_state: st.session_state.pesq_alto = False
-    if "pesq_vendidos" not in st.session_state: st.session_state.pesq_vendidos = False
-    if "pesq_sem_venda" not in st.session_state: st.session_state.pesq_sem_venda = False
-    if "pesq_ordenar" not in st.session_state: st.session_state.pesq_ordenar = "Relevância"
-    if "pesq_per_page" not in st.session_state: st.session_state.pesq_per_page = 8
-    if "pesq_page" not in st.session_state: st.session_state.pesq_page = 1
+    
 
     # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno (compactado)
     st.markdown("""
@@ -686,6 +691,7 @@ with tabs[2]:
             file_name=f"pesquisa_pagina_{page}.csv",
             mime="text/csv"
         )
+
 
 
 
