@@ -1,4 +1,4 @@
-# app.py - Dashboard Loja Importados (Roxo Minimalista) - Dark Theme Mobile
+# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -68,15 +68,15 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
   .kpi .value { font-size:16px; }
 }
 </style>
-    <style>
-    .stTextInput input {background:#222 !important;color:#fff !important;border:1px solid #555 !important;border-radius:8px !important;}
-    .stTextInput label {color:#eaeaea !important;font-weight:600 !important;}
-    .stSelectbox div[data-baseweb="select"] {background:#222 !important;border:1px solid #555 !important;color:#fff !important;border-radius:8px !important;}
-    .stSelectbox label {color:#eaeaea !important;font-weight:600 !important;}
-    .stCheckbox label {color:#eaeaea !important;font-weight:600 !important;}
-    .stButton button {background:#8b5cf6 !important;color:white !important;font-weight:700 !important;border:none !important;border-radius:8px !important;padding:6px 14px !important;}
-    .stButton button:hover {background:#a78bfa !important;}
-    </style>
+<style>
+.stTextInput input {background:#222 !important;color:#fff !important;border:1px solid #555 !important;border-radius:8px !important;}
+.stTextInput label {color:#eaeaea !important;font-weight:600 !important;}
+.stSelectbox div[data-baseweb="select"] {background:#222 !important;border:1px solid #555 !important;color:#fff !important;border-radius:8px !important;}
+.stSelectbox label {color:#eaeaea !important;font-weight:600 !important;}
+.stCheckbox label {color:#eaeaea !important;font-weight:600 !important;}
+.stButton button {background:#8b5cf6 !important;color:white !important;font-weight:700 !important;border:none !important;border-radius:8px !important;padding:6px 14px !important;}
+.stButton button:hover {background:#a78bfa !important;}
+</style>
 
 """, unsafe_allow_html=True)
 
@@ -93,7 +93,7 @@ st.markdown("""
     </svg>
   </div>
   <div>
-    <div class="title">Loja Importados - Dashboard</div>
+    <div class="title">Loja Importados — Dashboard</div>
     <div class="subtitle">Visão rápida de vendas e estoque</div>
   </div>
 </div>
@@ -393,7 +393,7 @@ tabs = st.tabs(["🛒 VENDAS", "📦 ESTOQUE", "🔍 PESQUISAR"])
 # =============================
 with tabs[0]:
 
-    st.subheader("Vendas - período selecionado")
+    st.subheader("Vendas — período selecionado")
 
     if vendas_filtradas.empty:
         st.info("Sem dados de vendas.")
@@ -448,7 +448,7 @@ with tabs[1]:
         estoque_display["VALOR_CUSTO_TOTAL_RAW"]=(estoque_display["Media C. UNITARIO"] * estoque_display["EM ESTOQUE"]).fillna(0)
         estoque_display["VALOR_VENDA_TOTAL_RAW"]=(estoque_display["Valor Venda Sugerido"] * estoque_display["EM ESTOQUE"]).fillna(0)
 
-        st.markdown("### 🥧 Distribuição de estoque - fatias com quantidade")
+        st.markdown("### 🥧 Distribuição de estoque — fatias com quantidade")
 
         top_for_pie=estoque_display.sort_values("EM ESTOQUE", ascending=False).head(10)
 
@@ -497,7 +497,7 @@ with tabs[1]:
 
         display_df=display_df.sort_values("EM ESTOQUE", ascending=False).reset_index(drop=True)
 
-        st.markdown("### 📋 Estoque - visão detalhada")
+        st.markdown("### 📋 Estoque — visão detalhada")
         st.dataframe(display_df, use_container_width=True)
 
 
@@ -507,11 +507,11 @@ with tabs[1]:
 
 
 # =============================
-# PESQUISAR (MODERNIZADA - FINAL CORRIGIDO)
+# PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
 # =============================
 with tabs[2]:
 
-    # CSS local da aba PESQUISAR - corrige texto escuro no PC e aplica grid moderno
+    # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno
     st.markdown("""
     <style>
     .card-grid {
@@ -564,7 +564,7 @@ with tabs[2]:
     </style>
     """, unsafe_allow_html=True)
 
-    st.subheader("🔍 Buscar produtos - visão moderna (sem margem)")
+    st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
 
     # INPUTS DE PESQUISA
     col_s1, col_s2 = st.columns([3,1])
@@ -608,6 +608,7 @@ with tabs[2]:
             vendas_agregado = pd.DataFrame(columns=["PRODUTO","TOTAL_QTD"])
 
         df = df_src.merge(vendas_agregado, how="left", on="PRODUTO").fillna({"TOTAL_QTD":0})
+        st.markdown(f\"**Resultados:** {len(df)} itens encontrados\")
 
         # FILTRO DE TEXTO
         if termo.strip():
@@ -638,51 +639,8 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        st.markdown(f"**Resultados:** {len(df)} itens encontrados")
-
-        if df_page.empty:
-            st.info("Nenhum produto nesta .")
-        else:
-            st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
-
-            for _, r in df_page.iterrows():
-                nome = r["PRODUTO"]
-                estoque = int(r["EM ESTOQUE"])
-                venda   = r["VENDA_FMT"]
-                custo   = r["CUSTO_FMT"]
-                vendidos = int(r["TOTAL_QTD"])
-
-                # BADGES
-                badges = []
-                if estoque <= 3:
-                    badges.append("<span class='badge low'>⚠️ Baixo estoque</span>")
-                if vendidos >= 15:
-                    badges.append("<span class='badge hot'>🔥 Saindo muito</span>")
-                if vendidos == 0:
-                    badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
-
-                badges_html = " ".join(badges)
-
-                # CARD HTML - SEM INDENTAÇÃO
-                html_card = f"""
-<div class='search-card'>
-<div class='search-title'>{nome}</div>
-<div>{badges_html}</div>
-<div class='meta'>
-Estoque: <b>{estoque}</b><br>
-Preço: <b>{venda}</b><br>
-Custo: <b>{custo}</b><br>
-Vendidos (total): <b>{vendidos}</b>
-</div>
-</div>
-"""
-
-                st.markdown(html_card, unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
         # EXPORTAÇÃO CSV
-        csv = df_page[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
+        csv = df[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
             "Valor Venda Sugerido":"PRECO_VENDA",
             "Media C. UNITARIO":"CUSTO_UNITARIO",
             "TOTAL_QTD":"VENDIDOS_TOTAL"
