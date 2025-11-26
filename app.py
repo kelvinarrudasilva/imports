@@ -501,53 +501,42 @@ with tabs[1]:
 # =============================
 with tabs[2]:
 
-    # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno
+    # **Estado inicial dos controles da aba PESQUISAR**
+    if "pesq_termo" not in st.session_state: st.session_state.pesq_termo = ""
+    if "pesq_baixo" not in st.session_state: st.session_state.pesq_baixo = False
+    if "pesq_alto" not in st.session_state: st.session_state.pesq_alto = False
+    if "pesq_vendidos" not in st.session_state: st.session_state.pesq_vendidos = False
+    if "pesq_sem_venda" not in st.session_state: st.session_state.pesq_sem_venda = False
+    if "pesq_ordenar" not in st.session_state: st.session_state.pesq_ordenar = "Relevância"
+    if "pesq_per_page" not in st.session_state: st.session_state.pesq_per_page = 8
+    if "pesq_page" not in st.session_state: st.session_state.pesq_page = 1
+
+    # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno (compactado)
     st.markdown("""
     <style>
     .card-grid {
         display:grid;
-        grid-template-columns: repeat(2, minmax(320px, 1fr));
-        gap:18px;
-        margin-top:16px;
+        grid-template-columns: repeat(2, minmax(260px, 1fr));
+        gap:12px;
+        margin-top:12px;
     }
-    @media (max-width: 800px) {
-        .card-grid { grid-template-columns: 1fr; }
-    }
+    @media (max-width: 800px) { .card-grid { grid-template-columns: 1fr; } }
     .search-card {
         background:#141414;
-        padding:16px;
-        border-radius:12px;
-        border:1px solid rgba(255,255,255,0.08);
-        box-shadow:0 6px 18px rgba(0,0,0,0.5);
-        transition: transform .12s ease;
+        padding:10px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,0.04);
+        box-shadow:0 6px 14px rgba(0,0,0,0.45);
+        transition: transform .12s ease, box-shadow .12s ease;
         color:#eaeaea;
-    }
-    .search-card:hover {
-        transform: translateY(-6px);
-        border-color: rgba(167,139,250,0.28);
-    }
-    .search-title {
-        color:#a78bfa;
-        font-weight:800;
-        font-size:15px;
-        margin-bottom:6px;
-    }
-    .meta {
-        color:#cfcfcf;
         font-size:13px;
-        margin-top:8px;
-        line-height:1.4;
+        line-height:1.2;
     }
-    .badge {
-        display:inline-block;
-        padding:4px 8px;
-        border-radius:8px;
-        font-size:12px;
-        margin-right:6px;
-        background:#222;
-        border:1px solid #333;
-        color:#eee;
-    }
+    .search-card:hover { transform: translateY(-6px); box-shadow:0 10px 30px rgba(0,0,0,0.6); border-color: rgba(167,139,250,0.18); }
+    .search-title { color:#a78bfa; font-weight:800; font-size:14px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .meta { color:#cfcfcf; font-size:13px; margin-top:6px; line-height:1.25; }
+    .meta b { color:#fff; }
+    .badge { display:inline-block; padding:3px 7px; border-radius:8px; font-size:11px; margin-right:6px; background:#222; border:1px solid #333; color:#eee; }
     .low  { background:#4b0000; border-color:#ff6b6b; }
     .hot  { background:#2b0030; border-color:#c77dff; }
     .zero { background:#2f2f2f; border-color:#666; }
@@ -556,35 +545,39 @@ with tabs[2]:
 
     st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
 
-    # INPUTS DE PESQUISA
+    # INPUTS DE PESQUISA (usando session_state)
     col_s1, col_s2 = st.columns([3,1])
     with col_s1:
-        termo = st.text_input(
-            "Procurar produto",
-            placeholder="Digite parte do nome..."
-        )
+        termo = st.text_input("Procurar produto", placeholder="Digite parte do nome...", key="pesq_termo")
     with col_s2:
-        limpar = st.button("Limpar")
+        if st.button("Limpar"):
+            # reset completo do estado da aba e rerun para refletir imediatamente
+            st.session_state.pesq_termo = ""
+            st.session_state.pesq_baixo = False
+            st.session_state.pesq_alto = False
+            st.session_state.pesq_vendidos = False
+            st.session_state.pesq_sem_venda = False
+            st.session_state.pesq_ordenar = "Relevância"
+            st.session_state.pesq_per_page = 8
+            st.session_state.pesq_page = 1
+            st.experimental_rerun()
 
-    if limpar:
-        st.experimental_set_query_params()
-        termo = ""
-
-    # FILTROS
+    # FILTROS (com keys)
     f1, f2, f3, f4 = st.columns(4)
-    filtro_baixo    = f1.checkbox("⚠️ Baixo estoque (≤3)")
-    filtro_alto     = f2.checkbox("📦 Alto estoque (≥20)")
-    filtro_vendidos = f3.checkbox("🔥 Com vendas")
-    filtro_sem_venda = f4.checkbox("❄️ Sem vendas")   # novo botão
+    filtro_baixo    = f1.checkbox("⚠️ Baixo estoque (≤3)", key="pesq_baixo")
+    filtro_alto     = f2.checkbox("📦 Alto estoque (≥20)", key="pesq_alto")
+    filtro_vendidos = f3.checkbox("🔥 Com vendas", key="pesq_vendidos")
+    filtro_sem_venda = f4.checkbox("❄️ Sem vendas", key="pesq_sem_venda")
 
     ordenar = st.selectbox(
         "Ordenar por:",
-        ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"]
+        ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"],
+        key="pesq_ordenar"
     )
 
     colp1, colp2 = st.columns([1,1])
-    per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=1)
-    page     = colp2.number_input("Página", min_value=1, value=1, step=1)
+    per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=[6,8,10,12].index(int(st.session_state.pesq_per_page)) if str(st.session_state.pesq_per_page).isdigit() else 1, key="pesq_per_page")
+    page     = colp2.number_input("Página", min_value=1, value=int(st.session_state.pesq_page), step=1, key="pesq_page")
 
     # BASE DE DADOS
     df_src = estoque_df.copy() if not estoque_df.empty else pd.DataFrame()
@@ -630,10 +623,11 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        # PAGINAÇÃO
+        # PAGINAÇÃO (usando valores do session_state)
         total_items = len(df)
+        per_page = int(st.session_state.pesq_per_page)
         total_pages = max(1, (total_items + per_page - 1)//per_page)
-        page = min(max(1, int(page)), total_pages)
+        page = min(max(1, int(st.session_state.pesq_page)), total_pages)
         start = (page-1)*per_page
         df_page = df.iloc[start:start+per_page]
 
@@ -662,25 +656,24 @@ with tabs[2]:
 
                 badges_html = " ".join(badges)
 
-                # CARD HTML — SEM INDENTAÇÃO
+                # CARD HTML — compacto (cada campo em linha, ocupa menos espaço)
                 html_card = f"""
 <div class='search-card'>
-<div class='search-title'>{nome}</div>
-<div>{badges_html}</div>
-<div class='meta'>
-Estoque: <b>{estoque}</b><br>
-Preço: <b>{venda}</b><br>
-Custo: <b>{custo}</b><br>
-Vendidos (total): <b>{vendidos}</b>
-</div>
+  <div class='search-title' title="{nome}">{nome}</div>
+  <div style="margin:6px 0">{badges_html}</div>
+  <div class='meta'>
+    Estoque: <b>{estoque}</b><br>
+    Preço: <b>{venda}</b><br>
+    Custo: <b>{custo}</b><br>
+    Vendidos (total): <b>{vendidos}</b>
+  </div>
 </div>
 """
-
                 st.markdown(html_card, unsafe_allow_html=True)
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-        # EXPORTAÇÃO CSV
+        # EXPORTAÇÃO CSV (página atual)
         csv = df_page[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
             "Valor Venda Sugerido":"PRECO_VENDA",
             "Media C. UNITARIO":"CUSTO_UNITARIO",
@@ -693,7 +686,6 @@ Vendidos (total): <b>{vendidos}</b>
             file_name=f"pesquisa_pagina_{page}.csv",
             mime="text/csv"
         )
-
 
 
 
