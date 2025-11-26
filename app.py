@@ -68,6 +68,16 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
   .kpi .value { font-size:16px; }
 }
 </style>
+    <style>
+    .stTextInput input {background:#222 !important;color:#fff !important;border:1px solid #555 !important;border-radius:8px !important;}
+    .stTextInput label {color:#eaeaea !important;font-weight:600 !important;}
+    .stSelectbox div[data-baseweb="select"] {background:#222 !important;border:1px solid #555 !important;color:#fff !important;border-radius:8px !important;}
+    .stSelectbox label {color:#eaeaea !important;font-weight:600 !important;}
+    .stCheckbox label {color:#eaeaea !important;font-weight:600 !important;}
+    .stButton button {background:#8b5cf6 !important;color:white !important;font-weight:700 !important;border:none !important;border-radius:8px !important;padding:6px 14px !important;}
+    .stButton button:hover {background:#a78bfa !important;}
+    </style>
+
 """, unsafe_allow_html=True)
 
 # =============================
@@ -582,8 +592,7 @@ with tabs[2]:
         ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"]
     )
 
-    colp1, colp2 = st.columns([1,1])
-    per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=1)
+    
     page     = colp2.number_input("Página", min_value=1, value=1, step=1)
 
     # BASE DE DADOS
@@ -630,14 +639,7 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        # PAGINAÇÃO
-        total_items = len(df)
-        total_pages = max(1, (total_items + per_page - 1)//per_page)
-        page = min(max(1, int(page)), total_pages)
-        start = (page-1)*per_page
-        df_page = df.iloc[start:start+per_page]
-
-        st.markdown(f"**Resultados:** {total_items} itens — página {page}/{total_pages}")
+        ** {total_items} itens — página {page}/{total_pages}")
 
         if df_page.empty:
             st.info("Nenhum produto nesta página.")
