@@ -1,4 +1,4 @@
-# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
+# app.py - Dashboard Loja Importados (Roxo Minimalista) - Dark Theme Mobile
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -93,7 +93,7 @@ st.markdown("""
     </svg>
   </div>
   <div>
-    <div class="title">Loja Importados — Dashboard</div>
+    <div class="title">Loja Importados - Dashboard</div>
     <div class="subtitle">Visão rápida de vendas e estoque</div>
   </div>
 </div>
@@ -393,7 +393,7 @@ tabs = st.tabs(["🛒 VENDAS", "📦 ESTOQUE", "🔍 PESQUISAR"])
 # =============================
 with tabs[0]:
 
-    st.subheader("Vendas — período selecionado")
+    st.subheader("Vendas - período selecionado")
 
     if vendas_filtradas.empty:
         st.info("Sem dados de vendas.")
@@ -448,7 +448,7 @@ with tabs[1]:
         estoque_display["VALOR_CUSTO_TOTAL_RAW"]=(estoque_display["Media C. UNITARIO"] * estoque_display["EM ESTOQUE"]).fillna(0)
         estoque_display["VALOR_VENDA_TOTAL_RAW"]=(estoque_display["Valor Venda Sugerido"] * estoque_display["EM ESTOQUE"]).fillna(0)
 
-        st.markdown("### 🥧 Distribuição de estoque — fatias com quantidade")
+        st.markdown("### 🥧 Distribuição de estoque - fatias com quantidade")
 
         top_for_pie=estoque_display.sort_values("EM ESTOQUE", ascending=False).head(10)
 
@@ -497,7 +497,7 @@ with tabs[1]:
 
         display_df=display_df.sort_values("EM ESTOQUE", ascending=False).reset_index(drop=True)
 
-        st.markdown("### 📋 Estoque — visão detalhada")
+        st.markdown("### 📋 Estoque - visão detalhada")
         st.dataframe(display_df, use_container_width=True)
 
 
@@ -507,11 +507,11 @@ with tabs[1]:
 
 
 # =============================
-# PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
+# PESQUISAR (MODERNIZADA - FINAL CORRIGIDO)
 # =============================
 with tabs[2]:
 
-    # CSS local da aba PESQUISAR — corrige texto escuro no PC e aplica grid moderno
+    # CSS local da aba PESQUISAR - corrige texto escuro no PC e aplica grid moderno
     st.markdown("""
     <style>
     .card-grid {
@@ -564,7 +564,7 @@ with tabs[2]:
     </style>
     """, unsafe_allow_html=True)
 
-    st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
+    st.subheader("🔍 Buscar produtos - visão moderna (sem margem)")
 
     # INPUTS DE PESQUISA
     col_s1, col_s2 = st.columns([3,1])
@@ -593,7 +593,6 @@ with tabs[2]:
     )
 
     
-    page     = colp2.number_input("Página", min_value=1, value=1, step=1)
 
     # BASE DE DADOS
     df_src = estoque_df.copy() if not estoque_df.empty else pd.DataFrame()
@@ -639,7 +638,7 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        ** {total_items} itens — página {page}/{total_pages}")
+        st.markdown(f"**Resultados:** {total_items} itens - página {page}/{total_pages}")
 
         if df_page.empty:
             st.info("Nenhum produto nesta página.")
@@ -664,7 +663,7 @@ with tabs[2]:
 
                 badges_html = " ".join(badges)
 
-                # CARD HTML — SEM INDENTAÇÃO
+                # CARD HTML - SEM INDENTAÇÃO
                 html_card = f"""
 <div class='search-card'>
 <div class='search-title'>{nome}</div>
