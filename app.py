@@ -638,10 +638,10 @@ with tabs[2]:
         else:
             df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-        st.markdown(f"**Resultados:** {total_items} itens - página {page}/{total_pages}")
+        st.markdown(f"**Resultados:** {len(df)} itens encontrados")
 
         if df_page.empty:
-            st.info("Nenhum produto nesta página.")
+            st.info("Nenhum produto nesta .")
         else:
             st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
 
@@ -689,7 +689,7 @@ Vendidos (total): <b>{vendidos}</b>
         }).to_csv(index=False).encode("utf-8")
 
         st.download_button(
-            "📥 Exportar esta página (CSV)",
+            "📥 Exportar esta  (CSV)",
             data=csv,
             file_name=f"pesquisa_pagina_{page}.csv",
             mime="text/csv"
