@@ -494,7 +494,6 @@ with tabs[1]:
 
 
 
-tabs = st.tabs(["Página Inicial", "Vendas", "Pesquisar", "Estoque", "Relatórios"])
 
 
 # =============================
