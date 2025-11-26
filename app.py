@@ -647,9 +647,9 @@ with tabs[2]:
         }).to_csv(index=False).encode("utf-8")
 
         st.download_button(
-            "📥 Exportar esta  (CSV)",
+            "📥 Exportar esta página (CSV)",
             data=csv,
-            file_name=f"pesquisa_pagina_{page}.csv",
+            file_name="pesquisa_completa.csv",
             mime="text/csv"
         )
 
