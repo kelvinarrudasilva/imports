@@ -495,134 +495,166 @@ with tabs[1]:
 
 
 
-
-
 # =============================
-# PESQUISAR
+# PESQUISAR (MODERNIZADA — MARGEM REMOVIDA)
 # =============================
 with tabs[2]:
 
-    # CSS ESPECÍFICO PARA FORÇAR TEXTO CLARO NA ABA
+    # local CSS para pesquisa (2 colunas no PC, 1 no mobile)
     st.markdown("""
     <style>
-    .search-area * {
-        color: #f0f0f0 !important;
+    .card-grid {
+        display:grid;
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
+        gap:18px;
+        margin-top:16px;
+    }
+    @media (max-width: 800px) {
+        .card-grid { grid-template-columns: 1fr; }
     }
     .search-card {
-        background: #141414;
-        padding: 14px;
-        border-radius: 12px;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.55);
-        border: 1px solid #2a2a2a;
-        height: 100%;
+        background:#141414;
+        padding:16px;
+        border-radius:12px;
+        border:1px solid rgba(255,255,255,0.03);
+        box-shadow:0 6px 18px rgba(0,0,0,0.5);
+        transition: transform .12s ease;
     }
-    .search-card h4 {
-        color: #a78bfa !important;
-        margin-bottom: 6px;
-    }
-    .btn-row button {
-        width: 100%;
-        font-weight: 700;
-        border-radius: 10px;
-        padding: 8px;
-    }
+    .search-card:hover { transform: translateY(-6px); border-color: rgba(167,139,250,0.12); }
+    .search-title { color:#a78bfa; font-weight:800; font-size:15px; margin-bottom:6px; }
+    .meta { color:#bdbdbd; font-size:13px; margin-top:8px; line-height:1.4; }
+    .badge { display:inline-block; padding:4px 8px; border-radius:8px; font-size:12px; margin-right:6px; background:#222; border:1px solid #333; color:#eee; }
+    .low { background:#4b0000; border-color:#ff6b6b; }
+    .hot { background:#2b0030; border-color:#c77dff; }
+    .zero { background:#2f2f2f; border-color:#666; }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="search-area">', unsafe_allow_html=True)
+    st.subheader("🔍 Buscar produtos — visão moderna (sem margem)")
 
-    st.subheader("🔍 Pesquisar produtos")
+    # Controls: search + clear
+    col_s1, col_s2 = st.columns([3,1])
+    with col_s1:
+        termo = st.text_input("Procurar produto", placeholder="Digite o nome ou parte dele...")
+    with col_s2:
+        limpar = st.button("Limpar")
 
-    termo = st.text_input("Digite parte do nome do produto")
+    if limpar:
+        # rerun clean
+        st.experimental_set_query_params()
+        termo = ""
 
-    # ----------------------------
-    # Filtros Extras
-    # ----------------------------
-    st.markdown("### 🔧 Filtros adicionais")
+    # Quick filters
+    f1, f2, f3 = st.columns(3)
+    filtro_baixo = f1.checkbox("⚠️ Estoque baixo (≤ 3)")
+    filtro_alto = f2.checkbox("📦 Estoque alto (≥ 20)")
+    filtro_vendidos = f3.checkbox("🔥 Com vendas")
 
-    colf1, colf2, colf3 = st.columns(3)
+    # Ordenar e paginação
+    ordenar = st.selectbox("Ordenar por:", ["Relevância","Nome A–Z","Estoque (maior→menor)","Preço (maior→menor)"])
+    colp1, colp2 = st.columns([1,1])
+    per_page = colp1.selectbox("Itens por página", [6,8,10,12], index=1)
+    page = colp2.number_input("Página", min_value=1, value=1, step=1)
 
-    with colf1:
-        filtro_estoque_min = st.number_input("Estoque mínimo:", min_value=0, value=0)
+    # Fonte de dados
+    df_src = estoque_df.copy() if not estoque_df.empty else pd.DataFrame()
 
-    with colf2:
-        preco_min = st.number_input("Preço mínimo (custo):", min_value=0.0, value=0.0)
-
-    with colf3:
-        preco_max = st.number_input("Preço máximo (custo):", min_value=0.0, value=99999.0)
-
-    st.markdown("### 🧭 Tipo de pesquisa")
-
-    col_btn1, col_btn2 = st.columns(2)
-
-    with col_btn1:
-        com_vendas = st.button("📈 Com vendas")
-
-    with col_btn2:
-        sem_vendas = st.button("❄️ Sem vendas")
-
-    # ----------------------------
-    # EXECUTAR BUSCA
-    # ----------------------------
-    if termo.strip():
-
-        if estoque_df.empty:
-            st.warning("Nenhum dado de estoque disponível para busca.")
+    if df_src.empty:
+        st.info("Nenhum dado de estoque disponível.")
+    else:
+        # vendas agregadas para filtro 'com vendas'
+        vendas_df = dfs.get("VENDAS", pd.DataFrame()).copy()
+        if not vendas_df.empty and "QTD" in vendas_df.columns:
+            vendas_agregado = vendas_df.groupby("PRODUTO", dropna=False)["QTD"].sum().reset_index().rename(columns={"QTD":"TOTAL_QTD"})
         else:
-            df_search = estoque_df.copy()
+            vendas_agregado = pd.DataFrame(columns=["PRODUTO","TOTAL_QTD"])
 
-            # Nome
-            df_search = df_search[df_search["PRODUTO"].str.contains(termo, case=False, na=False)]
+        df = df_src.merge(vendas_agregado, how="left", on="PRODUTO").fillna({"TOTAL_QTD":0})
 
-            # Filtro por estoque mínimo
-            df_search = df_search[df_search["EM ESTOQUE"] >= filtro_estoque_min]
+        # busca por termo
+        if termo and termo.strip():
+            df = df[df["PRODUTO"].str.contains(termo.strip(), case=False, na=False)].copy()
 
-            # Filtro por custo
-            df_search = df_search[
-                (df_search["Media C. UNITARIO"] >= preco_min) &
-                (df_search["Media C. UNITARIO"] <= preco_max)
-            ]
+        # filtros
+        if filtro_baixo:
+            df = df[df["EM ESTOQUE"] <= 3]
+        if filtro_alto:
+            df = df[df["EM ESTOQUE"] >= 20]
+        if filtro_vendidos:
+            df = df[df["TOTAL_QTD"] > 0]
 
-            # Filtro por botões
-            if com_vendas:
-                if "VENDAS" in dfs:
-                    produtos_com_venda = dfs["VENDAS"]["PRODUTO"].dropna().unique()
-                    df_search = df_search[df_search["PRODUTO"].isin(produtos_com_venda)]
+        # preparar campos para exibição (sem margem)
+        df["CUSTO_FMT"] = df["Media C. UNITARIO"].fillna(0).map(formatar_reais_com_centavos)
+        df["VENDA_FMT"] = df["Valor Venda Sugerido"].fillna(0).map(formatar_reais_com_centavos)
+        df["TOTAL_QTD"] = df["TOTAL_QTD"].fillna(0).astype(int)
 
-            if sem_vendas:
-                if "VENDAS" in dfs:
-                    produtos_com_venda = dfs["VENDAS"]["PRODUTO"].dropna().unique()
-                    df_search = df_search[~df_search["PRODUTO"].isin(produtos_com_venda)]
+        # ordenar
+        if ordenar == "Nome A–Z":
+            df = df.sort_values("PRODUTO", ascending=True)
+        elif ordenar == "Estoque (maior→menor)":
+            df = df.sort_values("EM ESTOQUE", ascending=False)
+        elif ordenar == "Preço (maior→menor)":
+            df = df.sort_values("Valor Venda Sugerido", ascending=False)
+        else:
+            df = df.sort_values(["TOTAL_QTD","EM ESTOQUE"], ascending=[False,False])
 
-            # Se nada encontrado
-            if df_search.empty:
-                st.warning("Nenhum produto encontrado com os filtros aplicados.")
-            else:
-                # Preparar exibição
-                df_search_display = df_search.copy()
-                df_search_display["CUSTO"] = df_search_display["Media C. UNITARIO"].map(formatar_reais_com_centavos)
-                df_search_display["VENDA"] = df_search_display["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+        # paginação
+        total_items = len(df)
+        total_pages = max(1, (total_items + per_page - 1)//per_page)
+        page = min(max(1, int(page)), total_pages)
+        start = (page-1)*per_page
+        df_page = df.iloc[start:start+per_page]
 
-                # ----------------------------
-                # EXIBIÇÃO EM CARDS (2 por linha no PC)
-                # ----------------------------
+        st.markdown(f"**Resultados:** {total_items} itens — página {page}/{total_pages}")
 
-                st.markdown("### 📦 Resultados da pesquisa")
+        if df_page.empty:
+            st.info("Nenhum produto nesta página.")
+        else:
+            st.markdown("<div class='card-grid'>", unsafe_allow_html=True)
+            for _, r in df_page.iterrows():
+                nome = r.get("PRODUTO","-")
+                estoque = int(r.get("EM ESTOQUE",0))
+                custo = r.get("CUSTO_FMT","R$ 0,00")
+                venda = r.get("VENDA_FMT","R$ 0,00")
+                vendidos = int(r.get("TOTAL_QTD",0))
 
-                cols = st.columns(2)
+                # badges simplificados (sem margem)
+                badges = []
+                if estoque <= 3:
+                    badges.append("<span class='badge low'>⚠️ Baixo estoque</span>")
+                if vendidos >= 15:
+                    badges.append("<span class='badge hot'>🔥 Saindo muito</span>")
+                if vendidos == 0:
+                    badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
 
-                idx = 0
-                for _, row in df_search_display.iterrows():
-                    col = cols[idx % 2]
-                    with col:
-                        st.markdown(f"""
-                        <div class="search-card">
-                            <h4>{row['PRODUTO']}</h4>
-                            <p><b>Estoque:</b> {row['EM ESTOQUE']}</p>
-                            <p><b>Custo:</b> {row['CUSTO']}</p>
-                            <p><b>Venda sugerida:</b> {row['VENDA']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    idx += 1
+                st.markdown(f"""
+                <div class='search-card'>
+                    <div class='search-title'>{nome}</div>
+                    <div>{' '.join(badges)}</div>
+                    <div class='meta'>
+                        Estoque: <b>{estoque}</b><br>
+                        Preço: <b>{venda}</b><br>
+                        Custo: <b>{custo}</b><br>
+                        Vendidos (total): <b>{vendidos}</b>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        # exporta apenas colunas relevantes (sem margem)
+        csv = df_page[["PRODUTO","EM ESTOQUE","Valor Venda Sugerido","Media C. UNITARIO","TOTAL_QTD"]].rename(columns={
+            "Valor Venda Sugerido":"PRECO_VENDA",
+            "Media C. UNITARIO":"CUSTO_UNITARIO",
+            "TOTAL_QTD":"VENDIDOS_TOTAL"
+        }).to_csv(index=False).encode("utf-8")
+
+        st.download_button("📥 Exportar esta página (CSV)", data=csv, file_name=f"pesquisa_pagina_{page}.csv", mime="text/csv")
+
+# =============================
+# Rodapé simples
+# =============================
+st.markdown("""
+<div style="margin-top:18px; color:#bdbdbd; font-size:12px;">
+  <em>Nota:</em> Valores de estoque (custo & venda) são calculados a partir das colunas <strong>Media C. UNITARIO</strong>, <strong>Valor Venda Sugerido</strong> e <strong>EM ESTOQUE</strong> — estes indicadores não são afetados pelo filtro de mês.
+</div>
+""", unsafe_allow_html=True)
