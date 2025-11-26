@@ -17,7 +17,7 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 st.markdown("""
 <style>
 :root{
-  --bg:#0b0b0b;
+--bg:#2a2a2a;
   --accent:#8b5cf6;
   --accent-2:#a78bfa;
   --muted:#bdbdbd;
@@ -509,16 +509,14 @@ with tabs[2]:
     st.markdown("""
     <style>
     /* Container around the search area */
-    
     .buscar-wrap{
-        background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABKElEQVR4nO3BMQEAAADCoPdPbQ43oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwKcBywABxZiZmgAAAABJRU5ErkJggg==') repeat !important;
+        background: linear-gradient(180deg, rgba(27,27,27,0.98), rgba(20,20,20,0.98));
         border-radius:14px;
         padding:24px;
-        border:1px solid rgba(0,0,0,0.06);
-        box-shadow:0 12px 40px rgba(0,0,0,0.15);
+        border:1px solid rgba(255,255,255,0.04);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.6);
         margin-top:10px;
     }
-
     .buscar-header{
         display:flex;
         align-items:center;
