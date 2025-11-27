@@ -9,6 +9,25 @@ from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
+
+# --- Simple auth (optional) ---
+if 'authed' not in st.session_state:
+    st.session_state['authed'] = False
+
+# Show login if not authed
+if not st.session_state['authed']:
+    with st.sidebar:
+        st.markdown('### 🔒 Login (temporário)')
+        pwd = st.text_input('Senha', type='password')
+        if st.button('Entrar'):
+            # default password: admin (change later)
+            if pwd == 'admin':
+                st.session_state['authed'] = True
+                st.experimental_rerun()
+            else:
+                st.error('Senha incorreta — tente "admin" ou configure a sua.')
+    st.stop()
+
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
@@ -67,6 +86,80 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
   .title { font-size:16px; }
   .kpi .value { font-size:16px; }
 }
+
+/* ===== PREMIUM VISUALS & ANIMATIONS ===== */
+/* Glassmorphism for cards */
+.card-ecom{
+  backdrop-filter: blur(6px) saturate(120%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+  transition: transform .32s cubic-bezier(.2,.8,.2,1), box-shadow .32s;
+}
+
+/* Hover depth */
+.card-ecom:hover{
+  transform: translateY(-8px) scale(1.01);
+  box-shadow: 0 18px 40px rgba(2,6,23,0.7);
+}
+
+/* Avatar neon gradient animation */
+.avatar{
+  background: linear-gradient(90deg,#8b5cf6,#ec4899,#06b6d4);
+  background-size: 300% 300%;
+  animation: neon 6s ease-in-out infinite;
+}
+@keyframes neon {
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+/* Entry animation for cards */
+.card-grid-ecom .card-ecom{
+  opacity:0;
+  transform: translateY(8px);
+  animation: enter .45s forwards cubic-bezier(.2,.8,.2,1);
+}
+.card-grid-ecom .card-ecom:nth-child(1){ animation-delay:0.03s; }
+.card-grid-ecom .card-ecom:nth-child(2){ animation-delay:0.06s; }
+.card-grid-ecom .card-ecom:nth-child(3){ animation-delay:0.09s; }
+@keyframes enter {
+  to { opacity:1; transform: translateY(0); }
+}
+
+/* Skeleton placeholder */
+.skel {
+  height: 120px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+  animation: pulse 1.2s infinite;
+}
+@keyframes pulse {
+  0%{opacity:0.6}
+  50%{opacity:1}
+  100%{opacity:0.6}
+}
+
+/* Small text styles for last purchase and badges */
+.small-muted { font-size:11px; color: #c7c7c7; margin-top:4px; }
+
+/* Mobile safe area and app-style bottom nav placeholder */
+@media (max-width:720px){
+  body, .stApp { padding-bottom: 64px !important; }
+}
+
+/* Force dark inputs (fix for Windows theme light) */
+input, textarea, select, .stTextInput input {
+    color:#ffffff !important;
+    background:#1a1a1a !important;
+    border: 1px solid rgba(255,255,255,0.06) !important;
+}
+.stCheckbox label, label { color:#fff !important; }
+
+/* Tiny neon accents for KPIs */
+.kpi { border-left-width: 6px; border-left-style: solid; }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -539,25 +632,20 @@ with tabs[2]:
     .low{background:#4b0000;color:#fff;}
     .hot{background:#3b0050;color:#fff;}
     .zero{background:#2f2f2f;color:#fff;}
-/* FORCE DARK TEXT & INPUTS EVEN WHEN WINDOWS THEME IS LIGHT */
-input, textarea, select {
-    color:#ffffff !important;
-    background:#1a1a1a !important;
-}
-.stTextInput input {
-    color:#ffffff !important;
-    background:#1a1a1a !important;
-}
-.stCheckbox label, label {
-    color:#ffffff !important;
-}
-
     </style>
     """, unsafe_allow_html=True)
 
     st.subheader("🔍 Buscar produtos — Modo E-commerce")
 
     termo = st.text_input("Buscar","",placeholder="Nome do produto...")
+
+    # Autocomplete suggestions (local, lightweight)
+    produtos_possiveis = estoque_df['PRODUTO'].dropna().unique().tolist() if not estoque_df.empty else []
+    sugestoes = [p for p in produtos_possiveis if termo.strip().lower() in p.lower()] if termo.strip() else []
+    if sugestoes:
+        escolha = st.selectbox('Sugestões', [''] + sugestoes, index=0)
+        if escolha:
+            termo = escolha
 
     filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)")
     filtro_alto = st.checkbox("📦 Alto estoque (≥20)")
@@ -598,7 +686,14 @@ input, textarea, select {
     df["CUSTO_FMT"]=df["Media C. UNITARIO"].map(formatar_reais_com_centavos)
     df["VENDA_FMT"]=df["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
 
-    itens_pagina = st.selectbox("Itens por página:", [6,9,12], index=0)
+    if 'itens_pagina' not in st.session_state:
+        st.session_state['itens_pagina'] = 6
+    st.session_state['itens_pagina'] = st.selectbox('Itens por página:', [6,9,12], index=[6,9,12].index(st.session_state['itens_pagina']))
+    itens_pagina = st.session_state['itens_pagina']
+    # Save layout preference
+    if 'layout_pref' not in st.session_state:
+        st.session_state['layout_pref'] = 'grid'
+    st.session_state['layout_pref'] = st.radio('Layout:', ['grid','list'], index=0, horizontal=True)
     total = len(df)
     total_paginas = max(1, (total + itens_pagina - 1)//itens_pagina)
 
@@ -621,6 +716,11 @@ input, textarea, select {
     df_page = df.iloc[inicio:fim]
 
     st.markdown(f"**{total} resultados encontrados**")
+
+    # skeleton loading (smooth)
+    with st.spinner('Carregando produtos...'):
+        import time
+        time.sleep(0.25)
 
     st.markdown("<div class='card-grid-ecom'>",unsafe_allow_html=True)
 
@@ -645,6 +745,10 @@ input, textarea, select {
 
         ultima = ultima_compra.get(nome, "—")
 
+
+        # build small card and a detalhes button that opens modal
+        ultima = ultima_compra.get(nome, "—")
+        # render card html
         html=f"""
 <div class='card-ecom'>
   <div class='avatar'>{iniciais}</div>
@@ -655,11 +759,84 @@ input, textarea, select {
       <div class='card-price'>{venda}</div>
       <div class='card-cost'>{custo}</div>
     </div>
-    <div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>
+    <div class='small-muted'>🕒 Última compra: <b>{ultima}</b></div>
     <div>{badges_html}</div>
   </div>
 </div>
 """
         st.markdown(html,unsafe_allow_html=True)
 
+        # detalhes modal
+        key_modal = f"detalhes_{nome}"
+        if st.button("Detalhes", key=key_modal):
+            with st.modal(f"Detalhes — {nome}"):
+                st.markdown(f"### {nome}")
+                col1, col2 = st.columns([2,1])
+                with col1:
+                    # vendas históricas (últimos 90 dias)
+                    vendas_prod = dfs.get('VENDAS', pd.DataFrame())
+                    if not vendas_prod.empty and 'DATA' in vendas_prod.columns:
+                        dfp = vendas_prod[vendas_prod['PRODUTO']==nome].copy()
+                        if not dfp.empty:
+                            dfp = dfp.groupby(dfp['DATA'].dt.strftime('%Y-%m-%d'))['QTD'].sum().reset_index()
+                            dfp.columns = ['DATA','QTD']
+                            import plotly.express as px
+                            fig = px.bar(dfp, x='DATA', y='QTD', title='Vendas por dia')
+                            st.plotly_chart(fig, use_container_width=True, config=dict(displayModeBar=False))
+                        else:
+                            st.info('Sem histórico de vendas para este produto.')
+                    else:
+                        st.info('Sem dados de vendas disponíveis.')
+
+                with col2:
+                    st.markdown('#### Ficha técnica')
+                    st.write({'Estoque': estoque, 'Vendidos': vendidos, 'Custo': custo, 'Venda': venda, 'Última compra': ultima})
+                    st.markdown('#### Simulador de preço')
+                    custo_input = st.number_input('Custo unitário (R$)', value=float(r.get('Media C. UNITARIO',0)) if 'Media C. UNITARIO' in r.index else 0.0, format='%.2f')
+                    margem = st.slider('Margem %', min_value=0, max_value=200, value=50)
+                    preco_sugerido = custo_input * (1 + margem/100)
+                    st.markdown(f"**Preço sugerido:** R$ {preco_sugerido:,.2f}")
+                    st.markdown('---')
+                    # Stock health
+                    if estoque <= 3:
+                        st.error('🔴 Estoque crítico')
+                    elif estoque < 10:
+                        st.warning('🟡 Estoque baixo')
+                    else:
+                        st.success('🟢 Estoque saudável')
+
+                st.button('Fechar')
+
     st.markdown("</div>",unsafe_allow_html=True)
+
+
+# ===== MEGA ADD-ONS (STUBS & INSTRUCTIONS) =====
+# Auto-sync (real-time) with Google Sheets: to enable, provide Google API credentials and implement a background
+# thread or use Pub/Sub to push updates. Placeholder function:
+def enable_realtime_sync(credentials_json_path=None):
+    # Implement Google Sheets API watch or use polling with exponential backoff.
+    pass
+
+# Notifications (Telegram) example stub:
+def send_telegram_message(bot_token, chat_id, text):
+    import requests
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    try:
+        requests.post(url, data=payload, timeout=6)
+    except Exception as e:
+        pass
+
+# PDF labels: can be implemented using reportlab to generate a PDF of labels for selected products
+def gerar_etiquetas_pdf(df_selected):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        c = canvas.Canvas('/tmp/etiquetas.pdf', pagesize=A4)
+        # implement label layout...
+        c.save()
+        return '/tmp/etiquetas.pdf'
+    except Exception as e:
+        return None
+
+# Sound alerts and push: requires user configuration (webhook / telegram / local sound file). Provide tokens in settings.
