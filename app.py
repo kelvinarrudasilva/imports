@@ -880,22 +880,25 @@ with tabs[2]:
         except Exception:
             dias_sem_venda = ""
         enc_style = ''
-        html = f"""
-<div class='card-ecom' {enc_style}>
-  <div class='avatar'>{iniciais}</div>
-  <div>
-    <div class='card-title'>{nome}</div>
-    <div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>
-    <div class='card-prices'>
-      <div class='card-price'>{venda}</div>
-      <div class='card-cost'>{custo}</div>
-    </div>
-    <div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>
-    {dias_sem_venda}
-    <div style='margin-top:4px;'>{badges_html}</div>
-  </div>
-</div>
-"""
+        
+        # build HTML card safely without triple quotes
+        html = (
+            f"<div class='card-ecom' {enc_style}>"
+            f"<div class='avatar'>{iniciais}</div>"
+            f"<div>"
+            f"<div class='card-title'>{nome}</div>"
+            f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
+            f"<div class='card-prices'>"
+            f"<div class='card-price'>{venda}</div>"
+            f"<div class='card-cost'>{custo}</div>"
+            f"</div>"
+            f"<div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>"
+            f"{dias_sem_venda}"
+            f"<div style='margin-top:4px;'>{badges_html}</div>"
+            f"</div>"
+            f"</div>"
+        )
+
         st.markdown(html,unsafe_allow_html=True)
 
     st.markdown("</div>",unsafe_allow_html=True)
