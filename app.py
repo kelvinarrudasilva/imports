@@ -15,59 +15,44 @@ URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5
 # CSS - Dark Theme (tabelas incluídas)
 # =============================
 st.markdown("""
+
 <style>
 :root{
-  --bg:#0b0b0b;
-  --accent:#8b5cf6;
-  --accent-2:#a78bfa;
-  --muted:#bdbdbd;
-  --card-bg:#141414;
-  --table-head:#161616;
-  --table-row:#121212;
+  --bg:#f8f8f8;
+  --accent:#f97316;
+  --accent-2:#fb923c;
+  --muted:#555;
+  --card-bg:#ffffff;
+  --table-head:#f3f3f3;
+  --table-row:#ffffff;
 }
-body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-.topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+body, .stApp { background: var(--bg) !important; color:#1a1a1a !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+.topbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow:0 4px 12px rgba(0,0,0,0.15); }
 .logo-wrap svg { width:26px; height:26px; }
-.title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
-.subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
+.title { font-size:20px; font-weight:800; color:#1a1a1a; margin:0; line-height:1; }
+.subtitle { margin:0; font-size:12px; color:#555; margin-top:2px; }
 .kpi-row { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
-.kpi { background:var(--card-bg); border-radius:10px; padding:10px 14px; box-shadow:0 6px 16px rgba(0,0,0,0.45); border-left:6px solid var(--accent); min-width:160px; display:flex; flex-direction:column; justify-content:center; color:#f0f0f0; }
-.kpi h3 { margin:0; font-size:12px; color:var(--accent-2); font-weight:800; letter-spacing:0.2px; }
-.kpi .value { margin-top:6px; font-size:20px; font-weight:900; color:#f0f0f0; white-space:nowrap; }
-.stTabs { margin-top: 20px !important; }
-.stTabs button { background:#1e1e1e !important; border:1px solid #333 !important; border-radius:12px !important; padding:8px 14px !important; margin-right:8px !important; margin-bottom:8px !important; font-weight:700 !important; color:var(--accent-2) !important; box-shadow:0 3px 10px rgba(0,0,0,0.2) !important; }
-
-/* Streamlit dataframes - dark */
-.stDataFrame, .element-container, .stTable {
-  color: #f0f0f0 !important;
-  font-size:13px !important;
-}
-.stDataFrame thead th {
-  background: linear-gradient(90deg, rgba(139,92,246,0.16), rgba(167,139,250,0.06)) !important;
-  color: #f0f0f0 !important;
-  font-weight:700 !important;
-  border-bottom: 1px solid #2a2a2a !important;
-}
-.stDataFrame tbody tr td {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(255,255,255,0.03) !important;
-  color: #eaeaea !important;
-}
-
-/* Smaller scrollbars in dark */
-div[data-testid="stHorizontalBlock"] > div > section::-webkit-scrollbar { height:8px; }
-div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8px; }
-
-/* Make container cards darker */
-.element-container { background: transparent !important; }
-
-/* responsive tweaks */
-@media (max-width: 600px) {
-  .title { font-size:16px; }
-  .kpi .value { font-size:16px; }
-}
+.kpi { background:var(--card-bg); border-radius:10px; padding:10px 14px; box-shadow:0 4px 14px rgba(0,0,0,0.08); border-left:6px solid var(--accent); min-width:160px; display:flex; flex-direction:column; justify-content:center; }
+.kpi h3 { margin:0; font-size:12px; color:var(--accent); font-weight:800; }
+.kpi .value { margin-top:6px; font-size:20px; font-weight:900; color:#1a1a1a; }
+.stTabs button { background:#fff !important; border:1px solid #ddd !important; border-radius:12px !important; padding:8px 14px !important; margin-right:8px !important; margin-bottom:8px !important; font-weight:700 !important; color:#f97316 !important; box-shadow:0 2px 6px rgba(0,0,0,0.08) !important; }
+.stDataFrame, .element-container, .stTable { color:#1a1a1a !important; font-size:13px !important; }
+.stDataFrame thead th { background:#ffe8d6 !important; color:#1a1a1a !important; font-weight:700 !important; border-bottom:1px solid #ddd !important; }
+.stDataFrame tbody tr td { background:transparent !important; border-bottom:1px solid rgba(0,0,0,0.05) !important; color:#222 !important; }
+.card-ecom{ background:#ffffff; border-radius:12px; padding:14px; border:1px solid #e5e5e5; display:flex; gap:12px; box-shadow:0 4px 12px rgba(0,0,0,0.06); }
+.avatar{ width:64px;height:64px;border-radius:14px; background:linear-gradient(135deg,#f97316,#fb923c); display:flex;align-items:center;justify-content:center; color:white;font-weight:900;font-size:22px; box-shadow:0 4px 10px rgba(0,0,0,0.15); flex-shrink:0; }
+.card-title{font-weight:900;font-size:16px;margin-bottom:6px;color:#1a1a1a;}
+.card-meta{font-size:13px;color:#555;margin-bottom:6px;}
+.card-prices{display:flex;gap:12px;margin-bottom:6px;}
+.card-price{color:#f97316;font-weight:900;}
+.card-cost{color:#444;font-weight:700;}
+.badge{padding:4px 8px;border-radius:8px;font-size:12px;}
+.low{background:#b91c1c;color:#fff;}
+.hot{background:#7c2d12;color:#fff;}
+.zero{background:#444;color:#fff;}
 </style>
+
 """, unsafe_allow_html=True)
 
 # =============================
