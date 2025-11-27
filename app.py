@@ -10,23 +10,6 @@ from io import BytesIO
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 
-# --- Simple auth (optional) ---
-if 'authed' not in st.session_state:
-    st.session_state['authed'] = False
-
-# Show login if not authed
-if not st.session_state['authed']:
-    with st.sidebar:
-        st.markdown('### 🔒 Login (temporário)')
-        pwd = st.text_input('Senha', type='password')
-        if st.button('Entrar'):
-            # default password: admin (change later)
-            if pwd == 'admin':
-                st.session_state['authed'] = True
-                st.experimental_rerun()
-            else:
-                st.error('Senha incorreta — tente "admin" ou configure a sua.')
-    st.stop()
 
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
