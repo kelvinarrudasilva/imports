@@ -539,6 +539,19 @@ with tabs[2]:
     .low{background:#4b0000;color:#fff;}
     .hot{background:#3b0050;color:#fff;}
     .zero{background:#2f2f2f;color:#fff;}
+/* FORCE DARK TEXT & INPUTS EVEN WHEN WINDOWS THEME IS LIGHT */
+input, textarea, select {
+    color:#ffffff !important;
+    background:#1a1a1a !important;
+}
+.stTextInput input {
+    color:#ffffff !important;
+    background:#1a1a1a !important;
+}
+.stCheckbox label, label {
+    color:#ffffff !important;
+}
+
     </style>
     """, unsafe_allow_html=True)
 
