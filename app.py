@@ -669,7 +669,7 @@ with tabs[2]:
     # Save layout preference
     if 'layout_pref' not in st.session_state:
         st.session_state['layout_pref'] = 'grid'
-    st.session_state['layout_pref'] = st.radio('Layout:', ['grid','list'], index=0, horizontal=True)
+    st.session_state['layout_pref'] = st.radio('Layout:', ['grid','list'], index=0 if st.session_state.get('layout_pref','grid')=='grid' else 1, horizontal=True)
     total = len(df)
     total_paginas = max(1, (total + itens_pagina - 1)//itens_pagina)
 
@@ -741,6 +741,29 @@ with tabs[2]:
 """
         
         st.markdown(html,unsafe_allow_html=True)
+        # compute extra metrics (displayed below card)
+        try:
+            custo_val = float(r.get('Media C. UNITARIO', 0)) if 'Media C. UNITARIO' in r.index else 0
+            venda_val = float(r.get('Valor Venda Sugerido', 0)) if 'Valor Venda Sugerido' in r.index else 0
+            margem = (venda_val - custo_val) / venda_val * 100 if venda_val else None
+        except:
+            margem = None
+
+        dias_sem_venda = '—'
+        try:
+            vendas_prod = dfs.get('VENDAS', pd.DataFrame())
+            if not vendas_prod.empty and 'DATA' in vendas_prod.columns:
+                vp = vendas_prod[vendas_prod['PRODUTO']==nome].copy()
+                if not vp.empty:
+                    last = vp['DATA'].max()
+                    dias_sem_venda = (pd.Timestamp.now() - pd.to_datetime(last)).days
+        except:
+            pass
+
+        margem_str = f"Margem: {margem:.0f}%" if margem is not None else "Margem: —"
+        dias_str = f"Dias desde última venda: {dias_sem_venda}"
+        st.markdown(f"<div class='small-muted'>{margem_str} • {dias_str}</div>", unsafe_allow_html=True)
+
 
         # detalhes modal
         key_modal = f"detalhes_{nome}"
