@@ -865,8 +865,7 @@ with tabs[2]:
                     )
         except Exception:
             dias_sem_venda = ""
-
-                enc_style = ''
+        enc_style = ''
 html = f"""
 <div class='card-ecom' {enc_style}>
   <div class='avatar'>{iniciais}</div>
