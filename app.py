@@ -9,8 +9,6 @@ from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-
-
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
@@ -566,12 +564,6 @@ with tabs[1]:
         st.markdown("### 📋 Estoque — visão detalhada")
         st.dataframe(display_df, use_container_width=True)
 
-
-
-
-
-
-
 # =============================
 # PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
 # =============================
@@ -580,9 +572,7 @@ with tabs[1]:
 # =============================
 with tabs[2]:
     # Modal state
-    if 'modal_produto' not in st.session_state:
-        st.session_state['modal_produto'] = None
-
+    
 
     st.markdown("""
     <style>
@@ -658,7 +648,6 @@ with tabs[2]:
         tmp = compras_df.groupby("PRODUTO")["DATA"].max().reset_index()
         ultima_compra = dict(zip(tmp["PRODUTO"], tmp["DATA"].dt.strftime("%d/%m/%Y")))
 
-
     if termo.strip():
         df = df[df["PRODUTO"].str.contains(termo,case=False,na=False)]
     if filtro_baixo:
@@ -732,7 +721,6 @@ with tabs[2]:
 
         ultima = ultima_compra.get(nome, "—")
 
-
         # build small card and a detalhes button that opens modal
         ultima = ultima_compra.get(nome, "—")
         # render card html
@@ -751,41 +739,17 @@ with tabs[2]:
   </div>
 </div>
 """
-        if st.button(f'Abrir {nome}', key=f'cardbtn_{nome}'):
-            st.session_state['modal_produto']=nome
+        
         st.markdown(html,unsafe_allow_html=True)
 
         # detalhes modal
         key_modal = f"detalhes_{nome}"
-        if st.button("Detalhes", key=key_modal):
-            st.session_state['modal_produto']=nome
+        
             
 
     
-    # Render Modal Premium
-    if st.session_state['modal_produto']:
-        sel = st.session_state['modal_produto']
-        st.markdown(f"""
-<style>
-.overlay{{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;}}
-.modal-box{{background:#141414;border-radius:16px;padding:24px;width:90%;max-width:600px;box-shadow:0 0 35px rgba(0,0,0,0.6);animation:pop .3s ease;}}
-@keyframes pop{{0%{{transform:scale(.85);opacity:0;}}100%{{transform:scale(1);opacity:1;}}}}
-</style>
-<div class='overlay'>
- <div class='modal-box'>
-   <h2 style='margin-top:0;'>Detalhes — {sel}</h2>
-   <p>Conteúdo premium aqui…</p>
-   </br>
-   <form action='' method='post'>
-     <button name='close_modal'>Fechar</button>
-   </form>
- </div>
-</div>
-""", unsafe_allow_html=True)
-        if st.button("Fechar Modal"):
-            st.session_state['modal_produto']=None
+    
 st.markdown("</div>",unsafe_allow_html=True)
-
 
 # ===== MEGA ADD-ONS (STUBS & INSTRUCTIONS) =====
 # Auto-sync (real-time) with Google Sheets: to enable, provide Google API credentials and implement a background
