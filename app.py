@@ -67,6 +67,64 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
   .title { font-size:16px; }
   .kpi .value { font-size:16px; }
 }
+
+.badge{
+    padding:4px 8px;
+    border-radius:8px;
+    font-size:12px;
+    display:inline-block;
+    font-weight:700;
+    letter-spacing:0.3px;
+    animation:fadeIn 0.6s ease;
+}
+
+.low{
+    background:rgba(255,0,0,0.25);
+    color:#ffb4b4;
+    box-shadow:0 0 8px rgba(255,0,0,0.35);
+}
+.hot{
+    background:rgba(150,0,255,0.25);
+    color:#e0b0ff;
+    box-shadow:0 0 8px rgba(150,0,255,0.35);
+}
+.zero{
+    background:rgba(255,255,255,0.1);
+    color:#fff;
+    box-shadow:0 0 8px rgba(255,255,255,0.15);
+}
+
+@keyframes fadeIn{
+    from{opacity:0; transform:translateY(4px);}
+    to{opacity:1; transform:translateY(0);}
+}
+
+.avatar{
+    width:64px;height:64px;border-radius:14px;
+    background:linear-gradient(120deg,#a78bfa,#ec4899,#06b6d4);
+    background-size:300% 300%;
+    animation:neonMove 6s ease infinite;
+    display:flex;align-items:center;justify-content:center;
+    color:white;font-weight:900;font-size:22px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.5);
+}
+@keyframes neonMove{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+}
+
+@keyframes pulseRed{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseOrange{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulsePurple{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseGreen{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+
+.card-ecom:hover{
+    transform:translateY(-2px);
+    transition:.2s;
+    box-shadow:0 8px 20px rgba(0,0,0,0.35);
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -539,7 +597,65 @@ with tabs[2]:
     .low{background:#4b0000;color:#fff;}
     .hot{background:#3b0050;color:#fff;}
     .zero{background:#2f2f2f;color:#fff;}
-    </style>
+    
+.badge{
+    padding:4px 8px;
+    border-radius:8px;
+    font-size:12px;
+    display:inline-block;
+    font-weight:700;
+    letter-spacing:0.3px;
+    animation:fadeIn 0.6s ease;
+}
+
+.low{
+    background:rgba(255,0,0,0.25);
+    color:#ffb4b4;
+    box-shadow:0 0 8px rgba(255,0,0,0.35);
+}
+.hot{
+    background:rgba(150,0,255,0.25);
+    color:#e0b0ff;
+    box-shadow:0 0 8px rgba(150,0,255,0.35);
+}
+.zero{
+    background:rgba(255,255,255,0.1);
+    color:#fff;
+    box-shadow:0 0 8px rgba(255,255,255,0.15);
+}
+
+@keyframes fadeIn{
+    from{opacity:0; transform:translateY(4px);}
+    to{opacity:1; transform:translateY(0);}
+}
+
+.avatar{
+    width:64px;height:64px;border-radius:14px;
+    background:linear-gradient(120deg,#a78bfa,#ec4899,#06b6d4);
+    background-size:300% 300%;
+    animation:neonMove 6s ease infinite;
+    display:flex;align-items:center;justify-content:center;
+    color:white;font-weight:900;font-size:22px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.5);
+}
+@keyframes neonMove{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+}
+
+@keyframes pulseRed{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseOrange{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulsePurple{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseGreen{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+
+.card-ecom:hover{
+    transform:translateY(-2px);
+    transition:.2s;
+    box-shadow:0 8px 20px rgba(0,0,0,0.35);
+}
+
+</style>
     """, unsafe_allow_html=True)
 
     st.subheader("🔍 Buscar produtos — Modo E-commerce")
@@ -630,9 +746,10 @@ with tabs[2]:
         if vendidos==0: badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
         badges_html=" ".join(badges)
 
-        ultima = ultima_compra.get(nome, "—")
+        
+ultima = ultima_compra.get(nome, "—")
 
-        # Dias desde a última venda
+        # Dias desde a última venda (premium animated)
         dias_sem_venda = ""
         try:
             vendas_prod = vendas_df[vendas_df["PRODUTO"] == nome]
@@ -640,7 +757,17 @@ with tabs[2]:
                 last_date = vendas_prod["DATA"].max()
                 if pd.notna(last_date):
                     delta = (pd.Timestamp.now() - last_date).days
-                    dias_sem_venda = f"<div style='font-size:11px;color:#777;margin-top:2px;'>📅 Dias sem vender: <b>{delta}</b></div>"
+
+                    if delta >= 60:
+                        cor = "#ef4444"; icone = "⛔"; pulse="pulseRed"
+                    elif delta >= 30:
+                        cor = "#f59e0b"; icone = "⚠️"; pulse="pulseOrange"
+                    elif delta >= 7:
+                        cor = "#a78bfa"; icone = "🕒"; pulse="pulsePurple"
+                    else:
+                        cor = "#22c55e"; icone = "✅"; pulse="pulseGreen"
+
+                    dias_sem_venda = f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
         except:
             dias_sem_venda = ""
 
@@ -657,7 +784,7 @@ with tabs[2]:
     </div>
     <div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>
     {dias_sem_venda}
-    <div>{badges_html}</div>
+    <div style='margin-top:4px;'>""" + badges_html + """</div>
   </div>
 </div>
 """
