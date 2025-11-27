@@ -745,10 +745,7 @@ with tabs[2]:
         if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
         if vendidos==0: badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
         badges_html=" ".join(badges)
-
-        
-ultima = ultima_compra.get(nome, "—")
-
+        ultima = ultima_compra.get(nome, \"—\")
         # Dias desde a última venda (premium animated)
         dias_sem_venda = ""
         try:
@@ -766,10 +763,9 @@ ultima = ultima_compra.get(nome, "—")
                         cor = "#a78bfa"; icone = "🕒"; pulse="pulsePurple"
                     else:
                         cor = "#22c55e"; icone = "✅"; pulse="pulseGreen"
-
-                    dias_sem_venda = f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
+        dias_sem_venda = f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
         except:
-            dias_sem_venda = ""
+        dias_sem_venda = ""
 
 
         html=f"""
