@@ -745,7 +745,7 @@ with tabs[2]:
         if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
         if vendidos==0: badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
         badges_html=" ".join(badges)
-        ultima = ultima_compra.get(nome, \"—\")
+        ultima = ultima_compra.get(nome, "—")
         # Dias desde a última venda (premium animated)
         dias_sem_venda = ""
         try:
