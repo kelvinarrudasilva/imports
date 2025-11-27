@@ -756,6 +756,29 @@ with tabs[2]:
                     delta = (pd.Timestamp.now() - last_date).days
 
                     if delta >= 60:
+                        cor = "#ef4444"; icone = "⛔"; pulse = "pulseRed"
+                    elif delta >= 30:
+                        cor = "#f59e0b"; icone = "⚠️"; pulse = "pulseOrange"
+                    elif delta >= 7:
+                        cor = "#a78bfa"; icone = "🕒"; pulse = "pulsePurple"
+                    else:
+                        cor = "#22c55e"; icone = "✅"; pulse = "pulseGreen"
+
+                    dias_sem_venda = (
+                        f"<div style='font-size:11px;margin-top:2px;color:{cor};"
+                        f"animation:{pulse} 2s infinite;'>{icone} Dias sem vender: "
+                        f"<b>{delta}</b></div>"
+                    )
+        except Exception:
+            dias_sem_venda = 
+        try:
+            vendas_prod = vendas_df[vendas_df["PRODUTO"] == nome]
+            if not vendas_prod.empty:
+                last_date = vendas_prod["DATA"].max()
+                if pd.notna(last_date):
+                    delta = (pd.Timestamp.now() - last_date).days
+
+                    if delta >= 60:
                         cor = "#ef4444"; icone = "⛔"; pulse="pulseRed"
                     elif delta >= 30:
                         cor = "#f59e0b"; icone = "⚠️"; pulse="pulseOrange"
@@ -771,7 +794,7 @@ with tabs[2]:
                     )
         except Exception:
             dias_sem_venda = ""
-html=f"""
+        html=f"""
 <div class='card-ecom'>
   <div class='avatar'>{iniciais}</div>
   <div>
