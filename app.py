@@ -579,6 +579,10 @@ with tabs[1]:
 # PESQUISAR — E-COMMERCE COMPLETO
 # =============================
 with tabs[2]:
+    # Modal state
+    if 'modal_produto' not in st.session_state:
+        st.session_state['modal_produto'] = None
+
 
     st.markdown("""
     <style>
@@ -747,50 +751,40 @@ with tabs[2]:
   </div>
 </div>
 """
+        if st.button(f'Abrir {nome}', key=f'cardbtn_{nome}'):
+            st.session_state['modal_produto']=nome
         st.markdown(html,unsafe_allow_html=True)
 
         # detalhes modal
         key_modal = f"detalhes_{nome}"
         if st.button("Detalhes", key=key_modal):
-            with st.modal(f"Detalhes — {nome}"):
-                st.markdown(f"### {nome}")
-                col1, col2 = st.columns([2,1])
-                with col1:
-                    # vendas históricas (últimos 90 dias)
-                    vendas_prod = dfs.get('VENDAS', pd.DataFrame())
-                    if not vendas_prod.empty and 'DATA' in vendas_prod.columns:
-                        dfp = vendas_prod[vendas_prod['PRODUTO']==nome].copy()
-                        if not dfp.empty:
-                            dfp = dfp.groupby(dfp['DATA'].dt.strftime('%Y-%m-%d'))['QTD'].sum().reset_index()
-                            dfp.columns = ['DATA','QTD']
-                            import plotly.express as px
-                            fig = px.bar(dfp, x='DATA', y='QTD', title='Vendas por dia')
-                            st.plotly_chart(fig, use_container_width=True, config=dict(displayModeBar=False))
-                        else:
-                            st.info('Sem histórico de vendas para este produto.')
-                    else:
-                        st.info('Sem dados de vendas disponíveis.')
+            st.session_state['modal_produto']=nome
+            
 
-                with col2:
-                    st.markdown('#### Ficha técnica')
-                    st.write({'Estoque': estoque, 'Vendidos': vendidos, 'Custo': custo, 'Venda': venda, 'Última compra': ultima})
-                    st.markdown('#### Simulador de preço')
-                    custo_input = st.number_input('Custo unitário (R$)', value=float(r.get('Media C. UNITARIO',0)) if 'Media C. UNITARIO' in r.index else 0.0, format='%.2f')
-                    margem = st.slider('Margem %', min_value=0, max_value=200, value=50)
-                    preco_sugerido = custo_input * (1 + margem/100)
-                    st.markdown(f"**Preço sugerido:** R$ {preco_sugerido:,.2f}")
-                    st.markdown('---')
-                    # Stock health
-                    if estoque <= 3:
-                        st.error('🔴 Estoque crítico')
-                    elif estoque < 10:
-                        st.warning('🟡 Estoque baixo')
-                    else:
-                        st.success('🟢 Estoque saudável')
-
-                st.button('Fechar')
-
-    st.markdown("</div>",unsafe_allow_html=True)
+    
+    # Render Modal Premium
+    if st.session_state['modal_produto']:
+        sel = st.session_state['modal_produto']
+        st.markdown(f"""
+<style>
+.overlay{{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);backdrop-filter:blur(6px);z-index:9999;display:flex;align-items:center;justify-content:center;}}
+.modal-box{{background:#141414;border-radius:16px;padding:24px;width:90%;max-width:600px;box-shadow:0 0 35px rgba(0,0,0,0.6);animation:pop .3s ease;}}
+@keyframes pop{{0%{{transform:scale(.85);opacity:0;}}100%{{transform:scale(1);opacity:1;}}}}
+</style>
+<div class='overlay'>
+ <div class='modal-box'>
+   <h2 style='margin-top:0;'>Detalhes — {sel}</h2>
+   <p>Conteúdo premium aqui…</p>
+   </br>
+   <form action='' method='post'>
+     <button name='close_modal'>Fechar</button>
+   </form>
+ </div>
+</div>
+""", unsafe_allow_html=True)
+        if st.button("Fechar Modal"):
+            st.session_state['modal_produto']=None
+st.markdown("</div>",unsafe_allow_html=True)
 
 
 # ===== MEGA ADD-ONS (STUBS & INSTRUCTIONS) =====
