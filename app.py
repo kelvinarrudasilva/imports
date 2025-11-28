@@ -832,10 +832,8 @@ col_a, col_b = st.columns([4,1])
 with col_a:
     termo = st.text_input("🔎 Buscar produto", value="", placeholder="Digite o nome do produto...")
 with col_b:
-    # compact summary on the right
-    st.markdown("""<div style='text-align:right; font-size:12px; color:#cfcfe0'>🔎 Busca minimalista<br>Resultados limpos</div>""", unsafe_allow_html=True)
+    st.markdown("""<div style='text-align:right; font-size:12px; color:#cfcfe0'>🔎 Busca minimalista<br>UI limpa</div>""", unsafe_allow_html=True)
 
-# advanced controls hidden in an expander to keep UI minimal and avoid breaking logic
 with st.expander("Opções avançadas ▸", expanded=False):
     cols = st.columns([1,1,1,1])
     with cols[0]:
@@ -851,6 +849,13 @@ with st.expander("Opções avançadas ▸", expanded=False):
         ver_tudo = st.checkbox("Ver tudo (sem paginação)", value=False)
 
 st.markdown("</div>", unsafe_allow_html=True)
+
+# filtros avançados
+filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)", value=False)
+filtro_alto = st.checkbox("📦 Alto estoque (≥20)", value=False)
+filtro_vendidos = st.checkbox("🔥 Com vendas", value=False)
+filtro_sem_venda = st.checkbox("❄️ Sem vendas", value=False)
+
 
 
     # filtros avançados
