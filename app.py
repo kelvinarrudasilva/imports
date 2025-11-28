@@ -10,50 +10,62 @@ from io import BytesIO
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 
-# --- Cálculo GLOBAL de Produtos Encalhados (usado para alerta e destaque nos cards) ---
 
-# --- Cálculo GLOBAL de Produtos Encalhados (usado para alerta e destaque nos cards) ---
+# --- Cálculo GLOBAL de Produtos Encalhados (limpo) ---
 def compute_encalhados_global(dfs, limit=10):
     import pandas as _pd
-    estoque_all = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
-    vendas_all = dfs.get("VENDAS", _pd.DataFrame()).copy()
-    compras_all = dfs.get("COMPRAS", _pd.DataFrame()).copy()
+    estoque = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
+    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    compras = dfs.get("COMPRAS", _pd.DataFrame()).copy()
 
-    if not compras_all.empty:
-        compras_all["DATA"] = _pd.to_datetime(compras_all["DATA"], errors="coerce")
-    if not vendas_all.empty:
-        vendas_all["DATA"] = _pd.to_datetime(vendas_all["DATA"], errors="coerce")
+    if not compras.empty:
+        compras["DATA"] = _pd.to_datetime(compras["DATA"], errors="coerce")
+    if not vendas.empty:
+        vendas["DATA"] = _pd.to_datetime(vendas["DATA"], errors="coerce")
 
-    if estoque_all.empty:
+    if estoque.empty:
         return [], _pd.DataFrame()
 
-    # last sale
-    if not vendas_all.empty and "PRODUTO" in vendas_all.columns:
-        last_sale = vendas_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_VENDA"})
+    # última venda
+    if not vendas.empty and "PRODUTO" in vendas.columns:
+        last_sale = vendas.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA": "ULT_VENDA"})
     else:
-        last_sale = _pd.DataFrame(columns=["PRODUTO","ULT_VENDA"])
-    # last buy
-    if not compras_all.empty and "PRODUTO" in compras_all.columns:
-        last_buy = compras_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_COMPRA"})
-    else:
-        last_buy = _pd.DataFrame(columns=["PRODUTO","ULT_COMPRA"])
+        last_sale = _pd.DataFrame(columns=["PRODUTO", "ULT_VENDA"])
 
-    enc = estoque_all.merge(last_sale, how="left", on="PRODUTO").merge(last_buy, how="left", on="PRODUTO")
+    # última compra
+    if not compras.empty and "PRODUTO" in compras.columns:
+        last_buy = compras.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA": "ULT_COMPRA"})
+    else:
+        last_buy = _pd.DataFrame(columns=["PRODUTO", "ULT_COMPRA"])
+
+    enc = estoque.merge(last_sale, how="left", on="PRODUTO").merge(last_buy, how="left", on="PRODUTO")
     enc = enc[enc.get("EM ESTOQUE", 0) > 0].copy()
 
     today = _pd.Timestamp.now()
+    enc["DIAS_PARADO"] = enc.apply(
+        lambda row: (today - row["ULT_VENDA"]).days if _pd.notna(row["ULT_VENDA"])
+        else (today - row["ULT_COMPRA"]).days if _pd.notna(row["ULT_COMPRA"])
+        else 9999, axis=1
+    )
 
-    def calc_days(row):
-        if _pd.notna(row.get("ULT_VENDA")):
-            return (today - row["ULT_VENDA"]).days
-        if _pd.notna(row.get("ULT_COMPRA")):
-            return (today - row["ULT_COMPRA"]).days
-        return 9999
-
-    enc["DIAS_PARADO"] = enc.apply(calc_days, axis=1)
     enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
-    enc_list = enc_sorted["PRODUTO"].tolist()
-    return enc_list, enc_sorted
+    return enc_sorted["PRODUTO"].tolist(), enc_sorted
+
+
+# --- Cálculo GLOBAL Top 5 mais vendidos ---
+def compute_top5_global(dfs):
+    import pandas as _pd
+    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    if vendas.empty or "PRODUTO" not in vendas.columns:
+        return []
+    if "QTD" not in vendas.columns:
+        for c in vendas.columns:
+            if c.upper() in ("QTD","QUANTIDADE","QTY"):
+                vendas["QTD"] = vendas[c]
+                break
+    vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
+    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
+    return list(top.index)
 
 
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
@@ -71,6 +83,7 @@ def compute_top5_global(dfs):
     vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
     top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
     return top.index.tolist()
+
 try:
     _top5_list_global = compute_top5_global(dfs)
 except:
