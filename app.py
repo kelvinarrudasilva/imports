@@ -71,14 +71,6 @@ def compute_top5_global(dfs):
     vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
     top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
     return top.index.tolist()
-(dfs):
-    import pandas as _pd
-    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
-    if vendas.empty or "PRODUTO" not in vendas.columns:
-        return []
-    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
-    return top.index.tolist()
-
 try:
     _top5_list_global = compute_top5_global(dfs)
 except:
