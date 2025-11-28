@@ -357,8 +357,6 @@ except Exception as e:
     st.stop()
 
 abas_all = xls.sheet_names
-dfs = {}
-for aba in ["ESTOQUE","VENDAS","COMPRAS"]:
 
 # === Inicializações corretas (campeão + encalhado) ===
 try:
@@ -371,7 +369,10 @@ try:
 except Exception:
     _enc_list_global, _enc_df_global = [], None
 
-    if aba in abas_all:
+dfs = {}
+for aba in ["ESTOQUE","VENDAS","COMPRAS"]:
+
+if aba in abas_all:
         raw = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
         cleaned = limpar_aba_raw(raw, aba)
         if cleaned is not None:
