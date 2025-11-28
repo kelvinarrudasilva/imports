@@ -12,6 +12,20 @@ st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", in
 
 # --- Cálculo GLOBAL de Produtos Encalhados (usado para alerta e destaque nos cards) ---
 def compute_encalhados_global(dfs, limit=10):
+
+# --- Cálculo GLOBAL Top 5 mais vendidos ---
+def compute_top5_global(dfs):
+    import pandas as _pd
+    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    if vendas.empty or "PRODUTO" not in vendas.columns:
+        return []
+    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
+    return top.index.tolist()
+
+try:
+    _top5_list_global = compute_top5_global(dfs)
+except:
+    _top5_list_global = []
     import pandas as _pd
     estoque_all = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
     vendas_all = dfs.get("VENDAS", _pd.DataFrame()).copy()
@@ -53,21 +67,16 @@ def compute_encalhados_global(dfs, limit=10):
     enc_list = enc_sorted["PRODUTO"].tolist()
     return enc_list, enc_sorted
 
-# --- Cálculo GLOBAL Top 5 mais vendidos ---
-def compute_top5_global(dfs):
-    import pandas as _pd
-    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
-    if vendas.empty or "PRODUTO" not in vendas.columns:
-        return []
-    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
-    return top.index.tolist()
-
+# compute once and show alert
 try:
-    _top5_list_global = compute_top5_global(dfs)
+    _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
+    if len(_enc_list_global) > 0:
+        st.warning(f"❄️ Produtos encalhados detectados: {len(_enc_list_global)} — vá em VENDAS > Produtos encalhados para ver a lista.")
 except Exception:
-    _top5_list_global = []
+    _enc_list_global, _enc_df_global = [], None
 
-URL_PLANILHA =URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
+
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
 # CSS - Dark Theme (tabelas incluídas)
@@ -811,119 +820,70 @@ with tabs[2]:
 
     st.markdown("<div class='card-grid-ecom'>",unsafe_allow_html=True)
 
-    for _, r in df_page.iterrows():
-        nome = r["PRODUTO"]
-        estoque = int(r.get("EM ESTOQUE",0))
-        venda = r.get("VENDA_FMT","R$ 0")
-        custo = r.get("CUSTO_FMT","R$ 0")
-        vendidos = int(r.get("TOTAL_QTD",0))
+    
+for _, r in df_page.iterrows():
+    nome = r["PRODUTO"]
+    estoque = int(r.get("EM ESTOQUE",0))
+    venda = r.get("VENDA_FMT","R$ 0")
+    custo = r.get("CUSTO_FMT","R$ 0")
+    vendidos = int(r.get("TOTAL_QTD",0))
 
-        partes = str(nome).split()
-        iniciais = ""
-        for p in partes[:2]:
-            if p:
-                iniciais += p[0].upper()
+    iniciais = "".join([p[0].upper() for p in str(nome).split()[:2] if p])
 
-        
-        
-        badges = []
-        # Baixo estoque
-        if estoque<=3: badges.append("<span class='badge low'>⚠️ Baixo</span>")
-        # Alta venda
-        if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
-
-        # ❄️ Sem vendas REAL
-        sem_vendas_real = False
-        if estoque > 0 and vendidos == 0:
-            if nome in ultima_compra and ultima_compra[nome] != "—":
-                vendas_produto = vendas_df[vendas_df["PRODUTO"] == nome]
-                if vendas_produto.empty:
-                    sem_vendas_real = True
-        if sem_vendas_real:
+    badges=[]
+    if estoque<=3: badges.append("<span class='badge low'>⚠️ Baixo</span>")
+    if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
+    if nome in ultima_compra and vendidos==0:
+        vendas_produto = vendas_df[vendas_df["PRODUTO"]==nome]
+        if vendas_produto.empty:
             badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
+    try:
+        if nome in _enc_list_global:
+            badges.append("<span class='badge zero'>❄️ Encalhado</span>")
+    except: pass
+    if nome in _top5_list_global:
+        badges.append("<span class='badge hot'>🥇 Campeão</span>")
+    badges_html=" ".join(badges)
 
-        # Encalhado
-        try:
-            if nome in _enc_list_global:
-                badges.append("<span class='badge zero'>❄️ Encalhado</span>")
-        except:
-            pass
+    ultima = ultima_compra.get(nome,"—")
 
-        
-if nome in _top5_list_global:
-    badges.append("<span class='badge hot'>🥇 Campeão</span>")
-badges_html = " ".join(badges)
+    enc_style=""
+    try:
+        if nome in _enc_list_global:
+            enc_style="style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
+        elif nome in _top5_list_global:
+            enc_style="style='border-left:6px solid #22c55e;'"
+    except: pass
 
-    
-    
-        ultima = ultima_compra.get(nome, "—")
-        enc_style = ""
-        try:
-            if nome in _enc_list_global:
-                enc_style = "style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
-            elif nome in _top5_list_global:
-                enc_style = "style='border-left:6px solid #22c55e;'"
-        except:
-            enc_style = ""
+    dias_sem_venda=""
+    try:
+        vendas_prod=vendas_df[vendas_df["PRODUTO"]==nome]
+        if not vendas_prod.empty:
+            last=vendas_prod["DATA"].max()
+            if pd.notna(last) and estoque>0:
+                delta=(pd.Timestamp.now()-last).days
+                if delta>=60: cor="#ef4444"; icone="⛔"; pulse="pulseRed"
+                elif delta>=30: cor="#f59e0b"; icone="⚠️"; pulse="pulseOrange"
+                elif delta>=7: cor="#a78bfa"; icone="🕒"; pulse="pulsePurple"
+                else: cor="#22c55e"; icone="✅"; pulse="pulseGreen"
+                dias_sem_venda=f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
+    except: pass
 
-        try:
-            if nome in _enc_list_global:
-                enc_style = "style='border-left:6px solid #0ea5e9;'"
-        except Exception:
-            enc_style = ""
-        try:
-            if nome in _enc_list_global:
-                enc_style = "style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
-            elif nome in _top5_list_global:
-                enc_style = "style='border-left:6px solid #22c55e;'"
-        except:
-            enc_style = ""
+    html = (
+        f"<div class='card-ecom' {enc_style}>"
+        f"<div class='avatar'>{iniciais}</div>"
+        f"<div>"
+        f"<div class='card-title'>{nome}</div>"
+        f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
+        f"<div class='card-prices'>"
+        f"<div class='card-price'>{venda}</div>"
+        f"<div class='card-cost'>{custo}</div>"
+        f"</div>"
+        f"<div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>"
+        f"{dias_sem_venda}"
+        f"<div style='margin-top:4px;'>{badges_html}</div>"
+        f"</div>"
+        f"</div>"
+    )
+    st.markdown(html, unsafe_allow_html=True)
 
-
-        # Dias desde a última venda — só se houver venda e estoque>0
-        dias_sem_venda = ""
-        try:
-            vendas_prod = vendas_df[vendas_df["PRODUTO"] == nome]
-            if not vendas_prod.empty and "DATA" in vendas_prod.columns:
-                last_date = vendas_prod["DATA"].max()
-                if pd.notna(last_date) and estoque>0:
-                    delta = (pd.Timestamp.now() - last_date).days
-                    if delta >= 60:
-                        cor = "#ef4444"; icone = "⛔"; pulse = "pulseRed"
-                    elif delta >= 30:
-                        cor = "#f59e0b"; icone = "⚠️"; pulse = "pulseOrange"
-                    elif delta >= 7:
-                        cor = "#a78bfa"; icone = "🕒"; pulse = "pulsePurple"
-                    else:
-                        cor = "#22c55e"; icone = "✅"; pulse = "pulseGreen"
-
-                    dias_sem_venda = (
-                        f"<div style='font-size:11px;margin-top:2px;color:{cor};"
-                        f"animation:{pulse} 2s infinite;'>{icone} Dias sem vender: "
-                        f"<b>{delta}</b></div>"
-                    )
-        except Exception:
-            dias_sem_venda = ""
-        enc_style = ''
-        
-        # build HTML card safely without triple quotes
-        html = (
-            f"<div class='card-ecom' {enc_style}>"
-            f"<div class='avatar'>{iniciais}</div>"
-            f"<div>"
-            f"<div class='card-title'>{nome}</div>"
-            f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
-            f"<div class='card-prices'>"
-            f"<div class='card-price'>{venda}</div>"
-            f"<div class='card-cost'>{custo}</div>"
-            f"</div>"
-            f"<div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>"
-            f"{dias_sem_venda}"
-            f"<div style='margin-top:4px;'>{badges_html}</div>"
-            f"</div>"
-            f"</div>"
-        )
-
-        st.markdown(html,unsafe_allow_html=True)
-
-    st.markdown("</div>",unsafe_allow_html=True)
