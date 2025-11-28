@@ -1,3 +1,4 @@
+# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -5,19 +6,14 @@ import re
 from datetime import datetime, timedelta
 import requests
 from io import BytesIO
-import pandas as _pd
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
-# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 
-# Initialize infinite scroll counter
-if 'quantidade_exibida' not in st.session_state:
-    st.session_state['quantidade_exibida'] = 10
 
 # --- Cálculo GLOBAL de Produtos Encalhados (limpo) ---
 def compute_encalhados_global(dfs, limit=10):
+    import pandas as _pd
     estoque = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
     vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
     compras = dfs.get("COMPRAS", _pd.DataFrame()).copy()
@@ -55,8 +51,10 @@ def compute_encalhados_global(dfs, limit=10):
     enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
     return enc_sorted["PRODUTO"].tolist(), enc_sorted
 
+
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
 def compute_top5_global(dfs):
+    import pandas as _pd
     vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
     if vendas.empty or "PRODUTO" not in vendas.columns:
         return []
@@ -69,7 +67,215 @@ def compute_top5_global(dfs):
     top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
     return list(top.index)
 
+
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
+def compute_top5_global(dfs):
+    import pandas as _pd
+    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    if vendas.empty or "PRODUTO" not in vendas.columns:
+        return []
+    if "QTD" not in vendas.columns:
+        # try to infer a quantity column
+        for c in vendas.columns:
+            if c.upper() in ("QTD","QUANTIDADE","QTY"):
+                vendas["QTD"] = vendas[c]
+                break
+    vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
+    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
+    return top.index.tolist()
+
+    _top5_list_global = []
+    import pandas as _pd
+    estoque_all = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
+    vendas_all = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    compras_all = dfs.get("COMPRAS", _pd.DataFrame()).copy()
+
+    if not compras_all.empty:
+        compras_all["DATA"] = _pd.to_datetime(compras_all["DATA"], errors="coerce")
+    if not vendas_all.empty:
+        vendas_all["DATA"] = _pd.to_datetime(vendas_all["DATA"], errors="coerce")
+
+    if estoque_all.empty:
+        return [], _pd.DataFrame()
+
+    # last sale
+    if not vendas_all.empty and "PRODUTO" in vendas_all.columns:
+        last_sale = vendas_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_VENDA"})
+    else:
+        last_sale = _pd.DataFrame(columns=["PRODUTO","ULT_VENDA"])
+    # last buy
+    if not compras_all.empty and "PRODUTO" in compras_all.columns:
+        last_buy = compras_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_COMPRA"})
+    else:
+        last_buy = _pd.DataFrame(columns=["PRODUTO","ULT_COMPRA"])
+
+    enc = estoque_all.merge(last_sale, how="left", on="PRODUTO").merge(last_buy, how="left", on="PRODUTO")
+    enc = enc[enc.get("EM ESTOQUE", 0) > 0].copy()
+
+    today = _pd.Timestamp.now()
+
+    def calc_days(row):
+        if _pd.notna(row.get("ULT_VENDA")):
+            return (today - row["ULT_VENDA"]).days
+        if _pd.notna(row.get("ULT_COMPRA")):
+            return (today - row["ULT_COMPRA"]).days
+        return 9999
+
+    enc["DIAS_PARADO"] = enc.apply(calc_days, axis=1)
+    enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
+    enc_list = enc_sorted["PRODUTO"].tolist()
+    return enc_list, enc_sorted
+
+# compute once and show alert
+try:
+    _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
+    if len(_enc_list_global) > 0:
+        st.warning(f"❄️ Produtos encalhados detectados: {len(_enc_list_global)} — vá em VENDAS > Produtos encalhados para ver a lista.")
+except Exception:
+    _enc_list_global, _enc_df_global = [], None
+
+
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
+
+# =============================
+# CSS - Dark Theme (tabelas incluídas)
+# =============================
+st.markdown("""
+<style>
+:root{
+  --bg:#0b0b0b;
+  --accent:#8b5cf6;
+  --accent-2:#a78bfa;
+  --muted:#bdbdbd;
+  --card-bg:#141414;
+  --table-head:#161616;
+  --table-row:#121212;
+}
+body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+.topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+.logo-wrap svg { width:26px; height:26px; }
+.title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
+.subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
+.kpi-row { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+.kpi { background:var(--card-bg); border-radius:10px; padding:10px 14px; box-shadow:0 6px 16px rgba(0,0,0,0.45); border-left:6px solid var(--accent); min-width:160px; display:flex; flex-direction:column; justify-content:center; color:#f0f0f0; }
+.kpi h3 { margin:0; font-size:12px; color:var(--accent-2); font-weight:800; letter-spacing:0.2px; }
+.kpi .value { margin-top:6px; font-size:20px; font-weight:900; color:#f0f0f0; white-space:nowrap; }
+.stTabs { margin-top: 20px !important; }
+.stTabs button { background:#1e1e1e !important; border:1px solid #333 !important; border-radius:12px !important; padding:8px 14px !important; margin-right:8px !important; margin-bottom:8px !important; font-weight:700 !important; color:var(--accent-2) !important; box-shadow:0 3px 10px rgba(0,0,0,0.2) !important; }
+
+/* Streamlit dataframes - dark */
+.stDataFrame, .element-container, .stTable {
+  color: #f0f0f0 !important;
+  font-size:13px !important;
+}
+.stDataFrame thead th {
+  background: linear-gradient(90deg, rgba(139,92,246,0.16), rgba(167,139,250,0.06)) !important;
+  color: #f0f0f0 !important;
+  font-weight:700 !important;
+  border-bottom: 1px solid #2a2a2a !important;
+}
+.stDataFrame tbody tr td {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255,255,255,0.03) !important;
+  color: #eaeaea !important;
+}
+
+/* Smaller scrollbars in dark */
+div[data-testid="stHorizontalBlock"] > div > section::-webkit-scrollbar { height:8px; }
+div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8px; }
+
+/* Make container cards darker */
+.element-container { background: transparent !important; }
+
+/* responsive tweaks */
+@media (max-width: 600px) {
+  .title { font-size:16px; }
+  .kpi .value { font-size:16px; }
+}
+
+.badge{
+    padding:4px 8px;
+    border-radius:8px;
+    font-size:12px;
+    display:inline-block;
+    font-weight:700;
+    letter-spacing:0.3px;
+    animation:fadeIn 0.6s ease;
+}
+
+.low{
+    background:rgba(255,0,0,0.25);
+    color:#ffb4b4;
+    box-shadow:0 0 8px rgba(255,0,0,0.35);
+}
+.hot{
+    background:rgba(150,0,255,0.25);
+    color:#e0b0ff;
+    box-shadow:0 0 8px rgba(150,0,255,0.35);
+}
+.zero{
+    background:rgba(255,255,255,0.1);
+    color:#fff;
+    box-shadow:0 0 8px rgba(255,255,255,0.15);
+}
+
+@keyframes fadeIn{
+    from{opacity:0; transform:translateY(4px);}
+    to{opacity:1; transform:translateY(0);}
+}
+
+.avatar{
+    width:64px;height:64px;border-radius:14px;
+    background:linear-gradient(120deg,#a78bfa,#ec4899,#06b6d4);
+    background-size:300% 300%;
+    animation:neonMove 6s ease infinite;
+    display:flex;align-items:center;justify-content:center;
+    color:white;font-weight:900;font-size:22px;
+    box-shadow:0 4px 14px rgba(0,0,0,0.5);
+}
+@keyframes neonMove{
+    0%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+    100%{background-position:0% 50%;}
+}
+
+@keyframes pulseRed{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseOrange{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulsePurple{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+@keyframes pulseGreen{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
+
+.card-ecom:hover{
+    transform:translateY(-2px);
+    transition:.2s;
+    box-shadow:0 8px 20px rgba(0,0,0,0.35);
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# =============================
+# Top Bar
+# =============================
+st.markdown("""
+<div class="topbar">
+  <div class="logo-wrap">
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="4" fill="white" fill-opacity="0.06"/>
+      <path d="M7 9h10l-1 6H8L7 9z" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
+      <path d="M9 6l2-2 2 2" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
+    </svg>
+  </div>
+  <div>
+    <div class="title">Loja Importados — Dashboard</div>
+    <div class="subtitle">Visão rápida de vendas e estoque</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+# =============================
+# Helpers
+# =============================
 def parse_money_value(x):
     try:
         if pd.isna(x): return float("nan")
@@ -227,6 +433,8 @@ try:
     _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
 except Exception:
     _enc_list_global, _enc_df_global = [], None
+
+
 
 # =============================
 # Conversores e ajustes
@@ -495,6 +703,9 @@ with tabs[0]:
         except Exception as e:
             st.write("Erro encalhados:", e)
 
+
+
+
 # =============================
 # ESTOQUE
 # =============================
@@ -559,6 +770,12 @@ with tabs[1]:
         st.markdown("### 📋 Estoque — visão detalhada")
         st.dataframe(display_df, use_container_width=True)
 
+
+
+
+
+
+
 # =============================
 # PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
 # =============================
@@ -567,67 +784,75 @@ with tabs[1]:
 # =============================
 
 with tabs[2]:
-    # ===== Modern Search (Auto-grid: desktop 3, tablet 2, mobile 1) =====
+    # ===== Modernized E-commerce Search / Grid =====
     st.markdown("""
     <style>
-    .search-topbar { display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
-    .glass-card { background: rgba(255,255,255,0.03); border-radius:14px; padding:4px; backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,0.05); box-shadow:0 6px 24px rgba(0,0,0,0.6); }
-    .card-grid-ecom { display:grid; grid-template-columns: repeat(3,1fr); gap:16px; }
+    /* glass + neon aesthetic for cards */
+    .search-topbar { display:flex; gap:12px; align-items:center; margin-bottom:12px; }
+    .glass-card { background: rgba(255,255,255,0.03); border-radius:14px; padding:10px; backdrop-filter: blur(6px) saturate(120%); -webkit-backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,0.04); box-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+    .neon-btn { padding:8px 12px; border-radius:10px; border:1px solid rgba(167,139,250,0.12); font-weight:700; }
+    .card-grid-ecom { display:grid; grid-template-columns: repeat(3,1fr); gap:16px; margin-top:12px; }
     @media(max-width:1200px){ .card-grid-ecom{grid-template-columns:repeat(2,1fr);} }
     @media(max-width:720px){ .card-grid-ecom{grid-template-columns:1fr;} }
 
     .card-ecom{
-        background: rgba(255,255,255,0.04);
-        border-radius:14px;
-        padding:16px;
-        border:1px solid rgba(255,255,255,0.05);
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+        border-radius:12px;
+        padding:14px;
+        border:1px solid rgba(167,139,250,0.06);
         display:flex;
-        gap:14px;
-        align-items:flex-start;
+        gap:12px;
+        align-items:center;
         transition: transform .18s ease, box-shadow .18s ease;
+        backdrop-filter: blur(4px);
     }
-    .card-ecom:hover{ transform: translateY(-6px); box-shadow: 0 14px 38px rgba(139,92,246,0.18); }
+    .card-ecom:hover{ transform: translateY(-6px); box-shadow: 0 18px 40px rgba(139,92,246,0.12); }
+    .avatar{ width:64px;height:64px;border-radius:14px; display:flex;align-items:center;justify-content:center; color:white;font-weight:900;font-size:22px; flex-shrink:0; }
+    .avatar.neon{ background: linear-gradient(135deg,#8b5cf6,#ec4899); box-shadow: 0 6px 18px rgba(139,92,246,0.12); }
+    .card-title{font-weight:900;font-size:15px;margin-bottom:4px;color:#fff;}
+    .card-meta{font-size:12px;color:#cfcfe0;margin-bottom:6px;}
+    .card-prices{display:flex;gap:10px;margin-bottom:6px;align-items:baseline;}
+    .card-price{color:#a78bfa;font-weight:900;}
+    .card-cost{color:#bdbdbd;font-weight:700;font-size:13px;}
+    .badge{padding:4px 8px;border-radius:8px;font-size:12px;margin-right:6px;display:inline-block;}
+    .low{background:rgba(255,69,96,0.12);color:#ffb4b4;border:1px solid rgba(255,69,96,0.06);}
+    .hot{background:rgba(139,92,246,0.12);color:#e9d5ff;border:1px solid rgba(139,92,246,0.06);}
+    .zero{background:rgba(255,255,255,0.04);color:#fff;border:1px solid rgba(255,255,255,0.03);}
+    .small-muted { font-size:11px; color: #bdbdbd; margin-top:4px; }
 
-    .avatar{
-        width:72px; height:72px; border-radius:16px; 
-        background: linear-gradient(135deg,#8b5cf6,#ec4899); 
-        display:flex; align-items:center; justify-content:center; 
-        color:white; font-weight:900; font-size:26px;
-        box-shadow:0 6px 20px rgba(139,92,246,0.25);
-        flex-shrink:0;
-    }
-
-    .card-title{ font-weight:900; font-size:17px; margin-bottom:4px; color:#fff; }
-    .card-meta{ font-size:13px; color:#d0cde6; margin-bottom:6px; }
-    .card-prices{ display:flex; gap:12px; margin-bottom:8px; }
-    .card-price{ color:#c4b5fd; font-weight:900; font-size:15px; }
-    .card-cost{ color:#bdbdbd; font-weight:700; font-size:13px; }
-
-    .badge{ padding:4px 8px; border-radius:8px; font-size:12px; margin-right:6px; display:inline-block; font-weight:700; }
-    .low{ background:rgba(255,59,59,0.18); color:#ffb4b4; }
-    .hot{ background:rgba(139,92,246,0.18); color:#e9d5ff; }
-    .zero{ background:rgba(255,255,255,0.08); color:white; }
+    .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .muted { color:#cfcfe0; font-size:13px; }
 
     </style>
     """, unsafe_allow_html=True)
 
-    st.subheader('🔎 Buscar — Produtos')
-
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     col_a, col_b = st.columns([3,2])
     with col_a:
-        termo = st.text_input("🔎 Buscar produto:", "", placeholder="Digite o nome...")
+        termo = st.text_input("🔎 Buscar produto", value="", placeholder="Digite o nome do produto...")
     with col_b:
-        itens_pagina = st.selectbox("Itens por página:", [6,9,12,24,36,48,60,100,200], index=2)
-        ordenar = st.selectbox("Ordenar por:", ["Nome A–Z","Nome Z–A","Menor preço","Maior preço","Mais vendidos","Maior estoque"], index=0)
+        # modern controls row
+        cols = st.columns([1,1,1,1])
+        with cols[0]:
+            itens_pagina = st.selectbox("Itens/pg", [6,9,12,24,36,48,60,100,200], index=2)
+        with cols[1]:
+            ordenar = st.selectbox("Ordenar por", [
+                "Nome A–Z","Nome Z–A","Menor preço","Maior preço",
+                "Mais vendidos","Maior estoque","Última compra (recente)","Última compra (antiga)"
+            ], index=0)
+        with cols[2]:
+            grid_cols = st.selectbox("Colunas", [2,3,4], index=1)
+        with cols[3]:
+            ver_tudo = st.checkbox("Ver tudo (sem paginação)", value=False)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Filters
-    filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)")
-    filtro_alto = st.checkbox("📦 Alto estoque (≥20)")
-    filtro_vendidos = st.checkbox("🔥 Com vendas")
-    filtro_sem_venda = st.checkbox("❄️ Sem vendas")
+    # filtros avançados
+    filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)", value=False)
+    filtro_alto = st.checkbox("📦 Alto estoque (≥20)", value=False)
+    filtro_vendidos = st.checkbox("🔥 Com vendas", value=False)
+    filtro_sem_venda = st.checkbox("❄️ Sem vendas", value=False)
 
+    # build df copy
     df = estoque_df.copy()
     vendas_df = dfs.get("VENDAS", pd.DataFrame()).copy()
     if not vendas_df.empty and "QTD" in vendas_df.columns:
@@ -636,89 +861,168 @@ with tabs[2]:
     else:
         df["TOTAL_QTD"]=0
 
-    # Apply filters
-    if termo.strip(): df = df[df["PRODUTO"].str.contains(termo,case=False,na=False)]
-    if filtro_baixo: df = df[df["EM ESTOQUE"]<=3]
-    if filtro_alto: df = df[df["EM ESTOQUE"]>=20]
-    if filtro_vendidos: df = df[df["TOTAL_QTD"]>0]
-    if filtro_sem_venda: df = df[df["TOTAL_QTD"]==0]
+    # ultima compra map
+    compras_df = dfs.get("COMPRAS", pd.DataFrame()).copy()
+    ultima_compra = {}
+    if not compras_df.empty and "DATA" in compras_df.columns and "PRODUTO" in compras_df.columns:
+        compras_df = compras_df.dropna(subset=["PRODUTO"])
+        compras_df["DATA"] = pd.to_datetime(compras_df["DATA"], errors="coerce")
+        tmp = compras_df.groupby("PRODUTO")["DATA"].max().reset_index()
+        ultima_compra = dict(zip(tmp["PRODUTO"], tmp["DATA"].dt.strftime("%d/%m/%Y")))
 
-    df["CUSTO_FMT"] = df["Media C. UNITARIO"].map(formatar_reais_com_centavos)
-    df["VENDA_FMT"] = df["Valor Venda Sugerido"].map(formatar_reais_com_centavos)
+    # apply search & filters
+    if termo and termo.strip():
+        df = df[df["PRODUTO"].str.contains(termo, case=False, na=False)]
+    if filtro_baixo:
+        df = df[df["EM ESTOQUE"]<=3]
+    if filtro_alto:
+        df = df[df["EM ESTOQUE"]>=20]
+    if filtro_vendidos:
+        df = df[df["TOTAL_QTD"]>0]
+    if filtro_sem_venda:
+        df = df[df["TOTAL_QTD"]==0]
 
-    # Sorting
-    if ordenar=="Nome A–Z": df=df.sort_values("PRODUTO")
-    elif ordenar=="Nome Z–A": df=df.sort_values("PRODUTO",ascending=False)
-    elif ordenar=="Menor preço": df=df.sort_values("Valor Venda Sugerido")
-    elif ordenar=="Maior preço": df=df.sort_values("Valor Venda Sugerido",ascending=False)
-    elif ordenar=="Mais vendidos": df=df.sort_values("TOTAL_QTD",ascending=False)
-    elif ordenar=="Maior estoque": df=df.sort_values("EM ESTOQUE",ascending=False)
+    # formatting
+    df["CUSTO_FMT"] = df.get("Media C. UNITARIO", 0).map(formatar_reais_com_centavos)
+    df["VENDA_FMT"] = df.get("Valor Venda Sugerido", 0).map(formatar_reais_com_centavos)
+
+    # sorting
+    if ordenar == "Nome A–Z":
+        df = df.sort_values("PRODUTO", ascending=True)
+    elif ordenar == "Nome Z–A":
+        df = df.sort_values("PRODUTO", ascending=False)
+    elif ordenar == "Menor preço":
+        df = df.sort_values("Valor Venda Sugerido", ascending=True)
+    elif ordenar == "Maior preço":
+        df = df.sort_values("Valor Venda Sugerido", ascending=False)
+    elif ordenar == "Mais vendidos":
+        if "TOTAL_QTD" in df.columns:
+            df = df.sort_values("TOTAL_QTD", ascending=False)
+    elif ordenar == "Maior estoque":
+        df = df.sort_values("EM ESTOQUE", ascending=False)
+    elif ordenar == "Última compra (recente)":
+        # ensure we have compras dataframe parsed
+        if not compras_df.empty:
+            tmp2 = compras_df.groupby("PRODUTO")["DATA"].max().reset_index()
+            tmp2.columns = ["PRODUTO","ULT_COMPRA_RAW"]
+            df = df.merge(tmp2, how="left", on="PRODUTO")
+            df["ULT_COMPRA_RAW"] = pd.to_datetime(df["ULT_COMPRA_RAW"], errors="coerce")
+            df = df.sort_values("ULT_COMPRA_RAW", ascending=False).drop(columns=["ULT_COMPRA_RAW"])
+    elif ordenar == "Última compra (antiga)":
+        if not compras_df.empty:
+            tmp2 = compras_df.groupby("PRODUTO")["DATA"].max().reset_index()
+            tmp2.columns = ["PRODUTO","ULT_COMPRA_RAW"]
+            df = df.merge(tmp2, how="left", on="PRODUTO")
+            df["ULT_COMPRA_RAW"] = pd.to_datetime(df["ULT_COMPRA_RAW"], errors="coerce")
+            df = df.sort_values("ULT_COMPRA_RAW", ascending=True).drop(columns=["ULT_COMPRA_RAW"])
 
     total = len(df)
-    total_paginas = max(1,(total+itens_pagina-1)//itens_pagina)
 
-    if "pagina" not in st.session_state: st.session_state["pagina"]=1
-    st.session_state["pagina"] = max(1,min(st.session_state["pagina"],total_paginas))
+    # pagination
+    if ver_tudo:
+        itens_pagina = total if total>0 else 1
+    else:
+        itens_pagina = int(itens_pagina)
 
-    colp1,colp2,colp3 = st.columns([1,2,1])
-    with colp1:
-        if st.button("⬅️"): st.session_state["pagina"] = max(1,st.session_state["pagina"]-1)
-    with colp2:
+    total_paginas = max(1, (total + itens_pagina - 1)//itens_pagina)
+
+    if "pagina" not in st.session_state:
+        st.session_state["pagina"] = 1
+    # clamp page
+    st.session_state["pagina"] = max(1, min(st.session_state["pagina"], total_paginas))
+
+    coln1, coln2, coln3 = st.columns([1,2,1])
+    with coln1:
+        if st.button("⬅️ Voltar"):
+            st.session_state["pagina"] = max(1, st.session_state["pagina"]-1)
+    with coln2:
         st.markdown(f"**Página {st.session_state['pagina']} de {total_paginas} — {total} resultados**")
-    with colp3:
-        if st.button("➡️"): st.session_state["pagina"] = min(total_paginas,st.session_state["pagina"]+1)
+    with coln3:
+        if st.button("Avançar ➡️"):
+            st.session_state["pagina"] = min(total_paginas, st.session_state["pagina"]+1)
 
-    inicio = (st.session_state["pagina"]-1)*itens_pagina
-    df_page = df.iloc[inicio:inicio+itens_pagina].reset_index(drop=True)
+    pagina = st.session_state["pagina"]
+    inicio = (pagina-1)*itens_pagina
+    fim = inicio + itens_pagina
+    df_page = df.iloc[inicio:fim].reset_index(drop=True)
 
-    st.markdown("<div class='card-grid-ecom'>",unsafe_allow_html=True)
+    # render grid with selected columns layout
+    # inject dynamic grid style
+    st.markdown(f"<style>.card-grid-ecom{{grid-template-columns: repeat({grid_cols},1fr);}}</style>", unsafe_allow_html=True)
+    st.markdown("<div class='card-grid-ecom'>", unsafe_allow_html=True)
 
     for _, r in df_page.iterrows():
-        nome = r["PRODUTO"]
-        estoque = int(r["EM ESTOQUE"])
-        venda = r["VENDA_FMT"]
-        custo = r["CUSTO_FMT"]
-        vendidos = int(r["TOTAL_QTD"])
-        iniciais = "".join([p[0].upper() for p in nome.split()[:2]])
+        nome = r.get("PRODUTO","")
+        estoque = int(r.get("EM ESTOQUE",0)) if pd.notna(r.get("EM ESTOQUE",0)) else 0
+        venda = r.get("VENDA_FMT","R$ 0")
+        custo = r.get("CUSTO_FMT","R$ 0")
+        vendidos = int(r.get("TOTAL_QTD",0)) if pd.notna(r.get("TOTAL_QTD",0)) else 0
 
-        badges=[]
-        if estoque<=3: badges.append("<span class='badge low'>⚠️ Baixo</span>")
-        if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
-        if nome in _enc_list_global: badges.append("<span class='badge zero'>🐌 Encalhado</span>")
-        if nome in _top5_list_global: badges.append("<span class='badge hot'>🥇 Campeão</span>")
-        badges_html=" ".join(badges)
+        iniciais = "".join([p[0].upper() for p in str(nome).split()[:2] if p]) or "—"
 
-        card=f"""
-        <div class='card-ecom'>
-            <div class='avatar'>{iniciais}</div>
-            <div>
-                <div class='card-title'>{nome}</div>
-                <div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>
-                <div class='card-prices'>
-                    <div class='card-price'>{venda}</div>
-                    <div class='card-cost'>{custo}</div>
-                </div>
-                <div>{badges_html}</div>
-            </div>
-        </div>"""
-        st.markdown(card,unsafe_allow_html=True)
+        badges = []
+        if estoque<=3: badges.append(f"<span class='badge low'>⚠️ Baixo</span>")
+        if vendidos>=15: badges.append(f"<span class='badge hot'>🔥 Saindo</span>")
+        if nome in ultima_compra and vendidos==0:
+            vendas_produto = vendas_df[vendas_df['PRODUTO']==nome] if not vendas_df.empty else pd.DataFrame()
+            if vendas_produto.empty: badges.append("<span class='badge slow'>❄️ Sem vendas</span>")
+        try:
+            if nome in _enc_list_global:
+                badges.append("<span class='badge zero'>🐌 Encalhado</span>")
+        except Exception:
+            pass
+        try:
+            if nome in _top5_list_global:
+                badges.append("<span class='badge hot'>🥇 Campeão</span>")
+        except Exception:
+            pass
 
-    st.markdown("</div>",unsafe_allow_html=True)
+        badges_html = " ".join(badges)
+        ultima = ultima_compra.get(nome,"—")
 
-# === SCROLL INFINITO BASEADO EM EXIBIR MAIS ===
-# Uso seguro: mantenha df_page como df_new_page onde necessário.
+        enc_style = ""
+        try:
+            if nome in _enc_list_global:
+                enc_style="style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
+            elif nome in _top5_list_global:
+                enc_style="style='border-left:6px solid #22c55e;'"
+        except Exception:
+            pass
 
-quant = st.session_state.get("quantidade_exibida", 10)
+        dias_sem_venda = ""
+        try:
+            vendas_prod = vendas_df[vendas_df["PRODUTO"]==nome] if not vendas_df.empty else pd.DataFrame()
+            if not vendas_prod.empty:
+                last = vendas_prod["DATA"].max()
+                if pd.notna(last) and estoque>0:
+                    delta = (pd.Timestamp.now() - last).days
+                    if delta>=60:
+                        cor="#ef4444"; icone="⛔"; pulse="pulseRed"
+                    elif delta>=30:
+                        cor="#f59e0b"; icone="⚠️"; pulse="pulseOrange"
+                    elif delta>=7:
+                        cor="#a78bfa"; icone="🕒"; pulse="pulsePurple"
+                    else:
+                        cor="#22c55e"; icone="✅"; pulse="pulseGreen"
+                    dias_sem_venda = f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
+        except Exception:
+            pass
 
-# substitua df_page por fatia incremental
-try:
-    df_page = df.iloc[:quant]
-except:
-    pass
+        avatar_html = f"<div class='avatar neon'>{iniciais}</div>"
+        card_html = (
+            f"<div class='card-ecom' {enc_style}>"
+            f"{avatar_html}"
+            f"<div style='flex:1;'>"
+            f"<div class='card-title'>{nome}</div>"
+            f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
+            f"<div class='card-prices'><div class='card-price'>{venda}</div><div class='card-cost'>{custo}</div></div>"
+            f"<div style='font-size:11px;color:#9ca3af;margin-top:4px;'>🕒 Última compra: <b>{ultima}</b></div>"
+            f"{dias_sem_venda}"
+            f"<div style='margin-top:6px;'>{badges_html}</div>"
+            f"</div>"
+            f"</div>"
+        )
+        st.markdown(card_html, unsafe_allow_html=True)
 
-# Botão centralizado estilo ML
-st.markdown("<div style='display:flex;justify-content:center;margin-top:20px;'>", unsafe_allow_html=True)
-if st.button("🔽 EXIBIR MAIS", key="mais_scroll"):
-    st.session_state["quantidade_exibida"] = quant + 10
-    st.rerun()
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
