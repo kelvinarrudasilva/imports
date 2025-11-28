@@ -225,6 +225,7 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
 
 @keyframes fadeIn{
     from{opacity:0; transform:translateY(4px);}
+import streamlit as st
     to{opacity:1; transform:translateY(0);}
 }
 
