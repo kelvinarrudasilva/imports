@@ -69,6 +69,72 @@ def compute_top5_global(dfs):
 
 
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
+def compute_top5_global(dfs):
+    import pandas as _pd
+    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    if vendas.empty or "PRODUTO" not in vendas.columns:
+        return []
+    if "QTD" not in vendas.columns:
+        # try to infer a quantity column
+        for c in vendas.columns:
+            if c.upper() in ("QTD","QUANTIDADE","QTY"):
+                vendas["QTD"] = vendas[c]
+                break
+    vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
+    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
+    return top.index.tolist()
+
+    _top5_list_global = []
+    import pandas as _pd
+    estoque_all = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
+    vendas_all = dfs.get("VENDAS", _pd.DataFrame()).copy()
+    compras_all = dfs.get("COMPRAS", _pd.DataFrame()).copy()
+
+    if not compras_all.empty:
+        compras_all["DATA"] = _pd.to_datetime(compras_all["DATA"], errors="coerce")
+    if not vendas_all.empty:
+        vendas_all["DATA"] = _pd.to_datetime(vendas_all["DATA"], errors="coerce")
+
+    if estoque_all.empty:
+        return [], _pd.DataFrame()
+
+    # last sale
+    if not vendas_all.empty and "PRODUTO" in vendas_all.columns:
+        last_sale = vendas_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_VENDA"})
+    else:
+        last_sale = _pd.DataFrame(columns=["PRODUTO","ULT_VENDA"])
+    # last buy
+    if not compras_all.empty and "PRODUTO" in compras_all.columns:
+        last_buy = compras_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_COMPRA"})
+    else:
+        last_buy = _pd.DataFrame(columns=["PRODUTO","ULT_COMPRA"])
+
+    enc = estoque_all.merge(last_sale, how="left", on="PRODUTO").merge(last_buy, how="left", on="PRODUTO")
+    enc = enc[enc.get("EM ESTOQUE", 0) > 0].copy()
+
+    today = _pd.Timestamp.now()
+
+    def calc_days(row):
+        if _pd.notna(row.get("ULT_VENDA")):
+            return (today - row["ULT_VENDA"]).days
+        if _pd.notna(row.get("ULT_COMPRA")):
+            return (today - row["ULT_COMPRA"]).days
+        return 9999
+
+    enc["DIAS_PARADO"] = enc.apply(calc_days, axis=1)
+    enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
+    enc_list = enc_sorted["PRODUTO"].tolist()
+    return enc_list, enc_sorted
+
+# compute once and show alert
+try:
+    _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
+    if len(_enc_list_global) > 0:
+        st.warning(f"❄️ Produtos encalhados detectados: {len(_enc_list_global)} — vá em VENDAS > Produtos encalhados para ver a lista.")
+except Exception:
+    _enc_list_global, _enc_df_global = [], None
+
+
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
 
 # =============================
@@ -277,13 +343,6 @@ def limpar_aba_raw(df_raw,nome):
 # Preparar tabela vendas
 # =============================
 def preparar_tabela_vendas(df):
-
-    # Criar lucro total adequado
-    df["LUCRO TOTAL"] = df["LUCRO UNITARIO"].astype(float) * df["QTD"].astype(float)
-    try:
-        df["LUCRO TOTAL"] = df["LUCRO TOTAL"].map(formatar_reais_com_centavos)
-    except:
-        pass
     if df is None or df.empty: 
         return pd.DataFrame()
 
@@ -357,8 +416,14 @@ except Exception as e:
     st.stop()
 
 abas_all = xls.sheet_names
-
-# === Inicializações corretas (campeão + encalhado) ===
+dfs = {}
+for aba in ["ESTOQUE","VENDAS","COMPRAS"]:
+    if aba in abas_all:
+        raw = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
+        cleaned = limpar_aba_raw(raw, aba)
+        if cleaned is not None:
+            dfs[aba] = cleaned
+# === Inicializações corretas ===
 try:
     _top5_list_global = compute_top5_global(dfs)
 except Exception:
@@ -369,14 +434,7 @@ try:
 except Exception:
     _enc_list_global, _enc_df_global = [], None
 
-dfs = {}
-for aba in ["ESTOQUE","VENDAS","COMPRAS"]:
 
-if aba in abas_all:
-        raw = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
-        cleaned = limpar_aba_raw(raw, aba)
-        if cleaned is not None:
-            dfs[aba] = cleaned
 
 # =============================
 # Conversores e ajustes
@@ -835,67 +893,68 @@ with tabs[2]:
 
     
     for _, r in df_page.iterrows():
-        nome = r["PRODUTO"]
-        estoque = int(r.get("EM ESTOQUE",0))
-        venda = r.get("VENDA_FMT","R$ 0")
-        custo = r.get("CUSTO_FMT","R$ 0")
-        vendidos = int(r.get("TOTAL_QTD",0))
+    nome = r["PRODUTO"]
+    estoque = int(r.get("EM ESTOQUE",0))
+    venda = r.get("VENDA_FMT","R$ 0")
+    custo = r.get("CUSTO_FMT","R$ 0")
+    vendidos = int(r.get("TOTAL_QTD",0))
 
-        iniciais = "".join([p[0].upper() for p in str(nome).split()[:2] if p])
+    iniciais = "".join([p[0].upper() for p in str(nome).split()[:2] if p])
 
-        badges=[]
-        if estoque<=3: badges.append("<span class='badge low'>⚠️ Baixo</span>")
-        if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
-        if nome in ultima_compra and vendidos==0:
-            vendas_produto = vendas_df[vendas_df["PRODUTO"]==nome]
-            if vendas_produto.empty:
-                badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
-        try:
-            if nome in _enc_list_global:
-                badges.append("<span class='badge zero'>❄️ Encalhado</span>")
-        except: pass
-        if nome in _top5_list_global:
-            badges.append("<span class='badge hot'>🥇 Campeão</span>")
-        badges_html=" ".join(badges)
+    badges=[]
+    if estoque<=3: badges.append("<span class='badge low'>⚠️ Baixo</span>")
+    if vendidos>=15: badges.append("<span class='badge hot'>🔥 Saindo</span>")
+    if nome in ultima_compra and vendidos==0:
+        vendas_produto = vendas_df[vendas_df["PRODUTO"]==nome]
+        if vendas_produto.empty:
+            badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
+    try:
+        if nome in _enc_list_global:
+            badges.append("<span class='badge zero'>❄️ Encalhado</span>")
+    except: pass
+    if nome in _top5_list_global:
+        badges.append("<span class='badge hot'>🥇 Campeão</span>")
+    badges_html=" ".join(badges)
 
-        ultima = ultima_compra.get(nome,"—")
+    ultima = ultima_compra.get(nome,"—")
 
-        enc_style=""
-        try:
-            if nome in _enc_list_global:
-                enc_style="style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
-            elif nome in _top5_list_global:
-                enc_style="style='border-left:6px solid #22c55e;'"
-        except: pass
+    enc_style=""
+    try:
+        if nome in _enc_list_global:
+            enc_style="style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
+        elif nome in _top5_list_global:
+            enc_style="style='border-left:6px solid #22c55e;'"
+    except: pass
 
-        dias_sem_venda=""
-        try:
-            vendas_prod=vendas_df[vendas_df["PRODUTO"]==nome]
-            if not vendas_prod.empty:
-                last=vendas_prod["DATA"].max()
-                if pd.notna(last) and estoque>0:
-                    delta=(pd.Timestamp.now()-last).days
-                    if delta>=60: cor="#ef4444"; icone="⛔"; pulse="pulseRed"
-                    elif delta>=30: cor="#f59e0b"; icone="⚠️"; pulse="pulseOrange"
-                    elif delta>=7: cor="#a78bfa"; icone="🕒"; pulse="pulsePurple"
-                    else: cor="#22c55e"; icone="✅"; pulse="pulseGreen"
-                    dias_sem_venda=f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
-        except: pass
+    dias_sem_venda=""
+    try:
+        vendas_prod=vendas_df[vendas_df["PRODUTO"]==nome]
+        if not vendas_prod.empty:
+            last=vendas_prod["DATA"].max()
+            if pd.notna(last) and estoque>0:
+                delta=(pd.Timestamp.now()-last).days
+                if delta>=60: cor="#ef4444"; icone="⛔"; pulse="pulseRed"
+                elif delta>=30: cor="#f59e0b"; icone="⚠️"; pulse="pulseOrange"
+                elif delta>=7: cor="#a78bfa"; icone="🕒"; pulse="pulsePurple"
+                else: cor="#22c55e"; icone="✅"; pulse="pulseGreen"
+                dias_sem_venda=f"<div style='font-size:11px;margin-top:2px;color:{cor};animation:{pulse} 2s infinite;'>{icone} Dias sem vender: <b>{delta}</b></div>"
+    except: pass
 
-        html = (
-            f"<div class='card-ecom' {enc_style}>"
-            f"<div class='avatar'>{iniciais}</div>"
-            f"<div>"
-            f"<div class='card-title'>{nome}</div>"
-            f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
-            f"<div class='card-prices'>"
-            f"<div class='card-price'>{venda}</div>"
-            f"<div class='card-cost'>{custo}</div>"
-            f"</div>"
-            f"<div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>"
-            f"{dias_sem_venda}"
-            f"<div style='margin-top:4px;'>{badges_html}</div>"
-            f"</div>"
-            f"</div>"
-        )
-        st.markdown(html, unsafe_allow_html=True)
+    html = (
+        f"<div class='card-ecom' {enc_style}>"
+        f"<div class='avatar'>{iniciais}</div>"
+        f"<div>"
+        f"<div class='card-title'>{nome}</div>"
+        f"<div class='card-meta'>Estoque: <b>{estoque}</b> • Vendidos: <b>{vendidos}</b></div>"
+        f"<div class='card-prices'>"
+        f"<div class='card-price'>{venda}</div>"
+        f"<div class='card-cost'>{custo}</div>"
+        f"</div>"
+        f"<div style='font-size:11px;color:#777;margin-top:2px;'>🕒 Última compra: <b>{ultima}</b></div>"
+        f"{dias_sem_venda}"
+        f"<div style='margin-top:4px;'>{badges_html}</div>"
+        f"</div>"
+        f"</div>"
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
