@@ -826,37 +826,25 @@ with tabs[2]:
     </style>
     """, unsafe_allow_html=True)
 
-    
-st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-col_a, col_b = st.columns([4,1])
-with col_a:
-    termo = st.text_input("🔎 Buscar produto", value="", placeholder="Digite o nome do produto...")
-with col_b:
-    st.markdown("""<div style='text-align:right; font-size:12px; color:#cfcfe0'>🔎 Busca minimalista<br>UI limpa</div>""", unsafe_allow_html=True)
-
-with st.expander("Opções avançadas ▸", expanded=False):
-    cols = st.columns([1,1,1,1])
-    with cols[0]:
-        itens_pagina = st.selectbox("Itens/pg", [6,9,12,24,36,48,60,100,200], index=2)
-    with cols[1]:
-        ordenar = st.selectbox("Ordenar por", [
-            "Nome A–Z","Nome Z–A","Menor preço","Maior preço",
-            "Mais vendidos","Maior estoque","Última compra (recente)","Última compra (antiga)"
-        ], index=0)
-    with cols[2]:
-        grid_cols = st.selectbox("Colunas", [2,3,4], index=1)
-    with cols[3]:
-        ver_tudo = st.checkbox("Ver tudo (sem paginação)", value=False)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-# filtros avançados
-filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)", value=False)
-filtro_alto = st.checkbox("📦 Alto estoque (≥20)", value=False)
-filtro_vendidos = st.checkbox("🔥 Com vendas", value=False)
-filtro_sem_venda = st.checkbox("❄️ Sem vendas", value=False)
-
-
+    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+    col_a, col_b = st.columns([3,2])
+    with col_a:
+        termo = st.text_input("🔎 Buscar produto", value="", placeholder="Digite o nome do produto...")
+    with col_b:
+        # modern controls row
+        cols = st.columns([1,1,1,1])
+        with cols[0]:
+            itens_pagina = st.selectbox("Itens/pg", [6,9,12,24,36,48,60,100,200], index=2)
+        with cols[1]:
+            ordenar = st.selectbox("Ordenar por", [
+                "Nome A–Z","Nome Z–A","Menor preço","Maior preço",
+                "Mais vendidos","Maior estoque","Última compra (recente)","Última compra (antiga)"
+            ], index=0)
+        with cols[2]:
+            grid_cols = st.selectbox("Colunas", [2,3,4], index=1)
+        with cols[3]:
+            ver_tudo = st.checkbox("Ver tudo (sem paginação)", value=False)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # filtros avançados
     filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)", value=False)
