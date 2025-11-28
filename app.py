@@ -282,12 +282,12 @@ def parse_money_value(x):
     except: pass
     s=str(x).strip()
     if s in ("","nan","none","-"): return float("nan")
-    s=re.sub(r"[^\d\.,\-]","",s)
+    s=re.sub(r"[^d.,-]","",s)
     if "." in s and "," in s: s=s.replace(".","").replace(",",".")
     else:
         if "," in s and "." not in s: s=s.replace(",",".")
         if s.count(".")>1: s=s.replace(".","")
-    s=re.sub(r"[^\d\.\-]","",s)
+    s=re.sub(r"[^d.-]","",s)
     try: return float(s)
     except: return float("nan")
 
@@ -299,7 +299,7 @@ def parse_int_series(serie):
         try:
             if pd.isna(x): return pd.NA
         except: pass
-        s=re.sub(r"[^\d\-]","",str(x))
+        s=re.sub(r"[^d-]","",str(x))
         if s in ("","-","nan"): return pd.NA
         try: return int(float(s))
         except: return pd.NA
@@ -308,7 +308,7 @@ def parse_int_series(serie):
 def formatar_reais_sem_centavos(v):
     try: v=float(v)
     except: return "R$ 0"
-    return f"R$ {f'{v:,.0f}'.replace(',', '.')}" 
+    return f"R$ {f'{v:,.0f}'.replace(',', '.')}"
 
 def formatar_reais_com_centavos(v):
     try: v=float(v)
@@ -343,7 +343,7 @@ def limpar_aba_raw(df_raw,nome):
 # Preparar tabela vendas
 # =============================
 def preparar_tabela_vendas(df):
-    if df is None or df.empty: 
+    if df is None or df.empty:
         return pd.DataFrame()
 
     d = df.copy()
@@ -638,7 +638,7 @@ with tabs[0]:
         except Exception:
             pass
 
-        
+
         # ---------------------
         # PRODUTOS ENCALHADOS — lógica profissional (global)
         # ---------------------
@@ -824,7 +824,7 @@ with tabs[2]:
             for k in ["termo","ordenar","cols","getitem","ver_tudo","f_baixo","f_alto","f_vendidos","f_sem_venda","pagina"]:
                 if k in st.session_state:
                     st.session_state.pop(k)
-            st.experimental_rerun()
+            st.rerun()
 
     with c2:
         st.write("")  # keep alignment
@@ -853,7 +853,7 @@ with tabs[2]:
     with fcol3:
         f_vendidos = st.checkbox("🔥 Com vendas", key="f_vendidos")
     with fcol4:
-        f_sem_venda = st.checkbox("❄️ Sem vendas", key="f_sem_venda")
+        f_sem_venda = st.checkbox("❄️ ❄️ Produto sem vendas", key="f_sem_venda")
 
     # build df copy and merge vendas/compras info
     df = estoque_df.copy() if not estoque_df.empty else pd.DataFrame(columns=["PRODUTO","EM ESTOQUE"])
@@ -1000,7 +1000,7 @@ with tabs[2]:
         except Exception:
             pass
         if total_vendido==0:
-            badges.append(("❌ Produto sem vendas","zero"))
+            badges.append(("❄️ Produto sem vendas","zero"))
         if estoque==0:
             badges.append(("❌ Sem estoque","zero"))
         if estoque<=3 and estoque>0:
@@ -1023,7 +1023,7 @@ with tabs[2]:
             border = ""
 
         # vendas label
-        vendas_label = f"<b>{total_vendido}</b> vendas" if total_vendido>0 else "Sem vendas"
+        vendas_label = f"<b>{total_vendido}</b> vendas" if total_vendido>0 else "❄️ Produto sem vendas"
 
         card_html = f"""
         <div class='card-ecom' style='{border}'>
