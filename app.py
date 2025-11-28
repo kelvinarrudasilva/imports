@@ -1,22 +1,22 @@
-# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import re
 from datetime import datetime, timedelta
 import requests
 from io import BytesIO
+import pandas as _pd
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
+# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 
 # Initialize infinite scroll counter
 if 'quantidade_exibida' not in st.session_state:
     st.session_state['quantidade_exibida'] = 10
 
-
 # --- Cálculo GLOBAL de Produtos Encalhados (limpo) ---
 def compute_encalhados_global(dfs, limit=10):
-    import pandas as _pd
     estoque = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
     vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
     compras = dfs.get("COMPRAS", _pd.DataFrame()).copy()
@@ -54,10 +54,8 @@ def compute_encalhados_global(dfs, limit=10):
     enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
     return enc_sorted["PRODUTO"].tolist(), enc_sorted
 
-
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
 def compute_top5_global(dfs):
-    import pandas as _pd
     vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
     if vendas.empty or "PRODUTO" not in vendas.columns:
         return []
@@ -70,216 +68,7 @@ def compute_top5_global(dfs):
     top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
     return list(top.index)
 
-
 # --- Cálculo GLOBAL Top 5 mais vendidos ---
-def compute_top5_global(dfs):
-    import pandas as _pd
-    vendas = dfs.get("VENDAS", _pd.DataFrame()).copy()
-    if vendas.empty or "PRODUTO" not in vendas.columns:
-        return []
-    if "QTD" not in vendas.columns:
-        # try to infer a quantity column
-        for c in vendas.columns:
-            if c.upper() in ("QTD","QUANTIDADE","QTY"):
-                vendas["QTD"] = vendas[c]
-                break
-    vendas["QTD"] = vendas.get("QTD", 0).fillna(0).astype(int)
-    top = vendas.groupby("PRODUTO")["QTD"].sum().sort_values(ascending=False).head(5)
-    return top.index.tolist()
-
-    _top5_list_global = []
-    import pandas as _pd
-    estoque_all = dfs.get("ESTOQUE", _pd.DataFrame()).copy()
-    vendas_all = dfs.get("VENDAS", _pd.DataFrame()).copy()
-    compras_all = dfs.get("COMPRAS", _pd.DataFrame()).copy()
-
-    if not compras_all.empty:
-        compras_all["DATA"] = _pd.to_datetime(compras_all["DATA"], errors="coerce")
-    if not vendas_all.empty:
-        vendas_all["DATA"] = _pd.to_datetime(vendas_all["DATA"], errors="coerce")
-
-    if estoque_all.empty:
-        return [], _pd.DataFrame()
-
-    # last sale
-    if not vendas_all.empty and "PRODUTO" in vendas_all.columns:
-        last_sale = vendas_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_VENDA"})
-    else:
-        last_sale = _pd.DataFrame(columns=["PRODUTO","ULT_VENDA"])
-    # last buy
-    if not compras_all.empty and "PRODUTO" in compras_all.columns:
-        last_buy = compras_all.groupby("PRODUTO")["DATA"].max().reset_index().rename(columns={"DATA":"ULT_COMPRA"})
-    else:
-        last_buy = _pd.DataFrame(columns=["PRODUTO","ULT_COMPRA"])
-
-    enc = estoque_all.merge(last_sale, how="left", on="PRODUTO").merge(last_buy, how="left", on="PRODUTO")
-    enc = enc[enc.get("EM ESTOQUE", 0) > 0].copy()
-
-    today = _pd.Timestamp.now()
-
-    def calc_days(row):
-        if _pd.notna(row.get("ULT_VENDA")):
-            return (today - row["ULT_VENDA"]).days
-        if _pd.notna(row.get("ULT_COMPRA")):
-            return (today - row["ULT_COMPRA"]).days
-        return 9999
-
-    enc["DIAS_PARADO"] = enc.apply(calc_days, axis=1)
-    enc_sorted = enc.sort_values("DIAS_PARADO", ascending=False).head(limit)
-    enc_list = enc_sorted["PRODUTO"].tolist()
-    return enc_list, enc_sorted
-
-# compute once and show alert
-try:
-    _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
-    if len(_enc_list_global) > 0:
-        st.warning(f"❄️ Produtos encalhados detectados: {len(_enc_list_global)} — vá em VENDAS > Produtos encalhados para ver a lista.")
-except Exception:
-    _enc_list_global, _enc_df_global = [], None
-
-
-URL_PLANILHA = "https://docs.google.com/spreadsheets/d/1TsRjsfw1TVfeEWBBvhKvsGQ5YUCktn2b/export?format=xlsx"
-
-# =============================
-# CSS - Dark Theme (tabelas incluídas)
-# =============================
-st.markdown("""
-<style>
-:root{
-  --bg:#0b0b0b;
-  --accent:#8b5cf6;
-  --accent-2:#a78bfa;
-  --muted:#bdbdbd;
-  --card-bg:#141414;
-  --table-head:#161616;
-  --table-row:#121212;
-}
-body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
-.topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
-.logo-wrap svg { width:26px; height:26px; }
-.title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
-.subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
-.kpi-row { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
-.kpi { background:var(--card-bg); border-radius:10px; padding:10px 14px; box-shadow:0 6px 16px rgba(0,0,0,0.45); border-left:6px solid var(--accent); min-width:160px; display:flex; flex-direction:column; justify-content:center; color:#f0f0f0; }
-.kpi h3 { margin:0; font-size:12px; color:var(--accent-2); font-weight:800; letter-spacing:0.2px; }
-.kpi .value { margin-top:6px; font-size:20px; font-weight:900; color:#f0f0f0; white-space:nowrap; }
-.stTabs { margin-top: 20px !important; }
-.stTabs button { background:#1e1e1e !important; border:1px solid #333 !important; border-radius:12px !important; padding:8px 14px !important; margin-right:8px !important; margin-bottom:8px !important; font-weight:700 !important; color:var(--accent-2) !important; box-shadow:0 3px 10px rgba(0,0,0,0.2) !important; }
-
-/* Streamlit dataframes - dark */
-.stDataFrame, .element-container, .stTable {
-  color: #f0f0f0 !important;
-  font-size:13px !important;
-}
-.stDataFrame thead th {
-  background: linear-gradient(90deg, rgba(139,92,246,0.16), rgba(167,139,250,0.06)) !important;
-  color: #f0f0f0 !important;
-  font-weight:700 !important;
-  border-bottom: 1px solid #2a2a2a !important;
-}
-.stDataFrame tbody tr td {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(255,255,255,0.03) !important;
-  color: #eaeaea !important;
-}
-
-/* Smaller scrollbars in dark */
-div[data-testid="stHorizontalBlock"] > div > section::-webkit-scrollbar { height:8px; }
-div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8px; }
-
-/* Make container cards darker */
-.element-container { background: transparent !important; }
-
-/* responsive tweaks */
-@media (max-width: 600px) {
-  .title { font-size:16px; }
-  .kpi .value { font-size:16px; }
-}
-
-.badge{
-    padding:4px 8px;
-    border-radius:8px;
-    font-size:12px;
-    display:inline-block;
-    font-weight:700;
-    letter-spacing:0.3px;
-    animation:fadeIn 0.6s ease;
-}
-
-.low{
-    background:rgba(255,0,0,0.25);
-    color:#ffb4b4;
-    box-shadow:0 0 8px rgba(255,0,0,0.35);
-}
-.hot{
-    background:rgba(150,0,255,0.25);
-    color:#e0b0ff;
-    box-shadow:0 0 8px rgba(150,0,255,0.35);
-}
-.zero{
-    background:rgba(255,255,255,0.1);
-    color:#fff;
-    box-shadow:0 0 8px rgba(255,255,255,0.15);
-}
-
-@keyframes fadeIn{
-    from{opacity:0; transform:translateY(4px);}
-import streamlit as st
-    to{opacity:1; transform:translateY(0);}
-}
-
-.avatar{
-    width:64px;height:64px;border-radius:14px;
-    background:linear-gradient(120deg,#a78bfa,#ec4899,#06b6d4);
-    background-size:300% 300%;
-    animation:neonMove 6s ease infinite;
-    display:flex;align-items:center;justify-content:center;
-    color:white;font-weight:900;font-size:22px;
-    box-shadow:0 4px 14px rgba(0,0,0,0.5);
-}
-@keyframes neonMove{
-    0%{background-position:0% 50%;}
-    50%{background-position:100% 50%;}
-    100%{background-position:0% 50%;}
-}
-
-@keyframes pulseRed{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
-@keyframes pulseOrange{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
-@keyframes pulsePurple{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
-@keyframes pulseGreen{0%{opacity:.7;}50%{opacity:1;}100%{opacity:.7;}}
-
-.card-ecom:hover{
-    transform:translateY(-2px);
-    transition:.2s;
-    box-shadow:0 8px 20px rgba(0,0,0,0.35);
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# =============================
-# Top Bar
-# =============================
-st.markdown("""
-<div class="topbar">
-  <div class="logo-wrap">
-    <svg viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="3" width="18" height="18" rx="4" fill="white" fill-opacity="0.06"/>
-      <path d="M7 9h10l-1 6H8L7 9z" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
-      <path d="M9 6l2-2 2 2" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
-    </svg>
-  </div>
-  <div>
-    <div class="title">Loja Importados — Dashboard</div>
-    <div class="subtitle">Visão rápida de vendas e estoque</div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
-# =============================
-# Helpers
-# =============================
 def parse_money_value(x):
     try:
         if pd.isna(x): return float("nan")
@@ -437,8 +226,6 @@ try:
     _enc_list_global, _enc_df_global = compute_encalhados_global(dfs, limit=10)
 except Exception:
     _enc_list_global, _enc_df_global = [], None
-
-
 
 # =============================
 # Conversores e ajustes
@@ -707,9 +494,6 @@ with tabs[0]:
         except Exception as e:
             st.write("Erro encalhados:", e)
 
-
-
-
 # =============================
 # ESTOQUE
 # =============================
@@ -774,19 +558,12 @@ with tabs[1]:
         st.markdown("### 📋 Estoque — visão detalhada")
         st.dataframe(display_df, use_container_width=True)
 
-
-
-
-
-
-
 # =============================
 # PESQUISAR (MODERNIZADA — FINAL CORRIGIDO)
 # =============================
 # =============================
 # PESQUISAR — E-COMMERCE COMPLETO
 # =============================
-
 
 with tabs[2]:
     # ===== Modern Search (Auto-grid: desktop 3, tablet 2, mobile 1) =====
@@ -924,8 +701,6 @@ with tabs[2]:
         st.markdown(card,unsafe_allow_html=True)
 
     st.markdown("</div>",unsafe_allow_html=True)
-
-
 
 # === SCROLL INFINITO BASEADO EM EXIBIR MAIS ===
 # Uso seguro: mantenha df_page como df_new_page onde necessário.
