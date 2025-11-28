@@ -907,10 +907,10 @@ with tabs[2]:
     if nome in ultima_compra and vendidos==0:
         vendas_produto = vendas_df[vendas_df["PRODUTO"]==nome]
         if vendas_produto.empty:
-            badges.append("<span class='badge zero'>❄️ Sem vendas</span>")
+            badges.append("<span class='badge slow'>🐌 Sem vendas</span>")
     try:
         if nome in _enc_list_global:
-            badges.append("<span class='badge zero'>❄️ Encalhado</span>")
+            badges.append("<span class='badge zero'>🐌 Encalhado</span>")
     except: pass
     if nome in _top5_list_global:
         badges.append("<span class='badge hot'>🥇 Campeão</span>")
