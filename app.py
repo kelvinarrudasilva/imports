@@ -893,7 +893,7 @@ with tabs[2]:
 
     
     for _, r in df_page.iterrows():
-            nome = r["PRODUTO"]
+        nome = r["PRODUTO"]
         estoque = int(r.get("EM ESTOQUE",0))
         venda = r.get("VENDA_FMT","R$ 0")
         custo = r.get("CUSTO_FMT","R$ 0")
@@ -957,4 +957,3 @@ with tabs[2]:
             f"</div>"
         )
     st.markdown(html, unsafe_allow_html=True)
-
