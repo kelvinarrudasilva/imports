@@ -1087,27 +1087,36 @@ div.stButton:last-of-type::after {
 
     # render grid with selected columns layout
     # inject dynamic grid style
-    st.markdown(f"<style>.card-grid-ecom{{grid-template-columns: repeat({grid_cols},1fr);}}
-div.stButton:last-of-type::after {
-    content: "!";
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    width: 18px;
-    height: 18px;
-    background: #ff3333;
-    color: white;
-    border-radius: 50%;
-    font-size: 13px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    box-shadow:0 0 10px #ff3333;
-    animation: pulse 1.3s infinite;
-}
+    
+st.markdown(
+    f"""
+    <style>
+    .card-grid-ecom {{
+        grid-template-columns: repeat({grid_cols}, 1fr);
+    }}
 
-</style>", unsafe_allow_html=True)
-    st.markdown("<div class='card-grid-ecom'>", unsafe_allow_html=True)
+    div.stButton:last-of-type::after {{
+        content: "!";
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 18px;
+        height: 18px;
+        background: #ff3333;
+        color: white;
+        border-radius: 50%;
+        font-size: 13px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        box-shadow:0 0 10px #ff3333;
+        animation: pulse 1.3s infinite;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+st.markdown("<div class='card-grid-ecom'>", unsafe_allow_html=True)
 
     for _, r in df_page.iterrows():
         nome = r.get("PRODUTO","")
