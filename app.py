@@ -1,45 +1,79 @@
 # app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 import streamlit as st
 
+# ============================
+# 🔄 BOTÃO FLUTUANTE REAL + NEON
+# ============================
+refresh_area = st.empty()
+refresh_btn = None
+with refresh_area.container():
+    refresh_btn = st.button("🔄")
+    if refresh_btn:
+        st.session_state["refresh_now"] = True
+
+st.markdown("""
+<style>
+div.stButton > button {
+    position: fixed !important;
+    bottom: 26px !important;
+    right: 26px !important;
+    z-index: 99999 !important;
+    background: linear-gradient(135deg, #a855f7, #7c3aed) !important;
+    color: white !important;
+    border-radius: 50% !important;
+    width: 68px !important;
+    height: 68px !important;
+    font-size: 32px !important;
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.65) !important;
+    transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+div.stButton > button:hover {
+    transform: scale(1.15) rotate(190deg) !important;
+    box-shadow: 0 0 40px rgba(168, 85, 247, 0.95) !important;
+}
+
+@keyframes pulse {0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);} }
+
+div.stButton:last-of-type::after {
+    content: "!";
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #ff3333;
+    color: white;
+    border-radius: 50%;
+    font-size: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 0 10px #ff3333;
+    animation: pulse 1.3s infinite;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# notifications
+if refresh_btn:
+    with st.spinner("🔄 Carregando..."):
+        pass
+    st.success("✔️ Atualizado!")
+    st.rerun()
+
+
 # ================================================
 # 🔄 BOTÃO FLUTUANTE PREMIUM (ROXO NEON + ANIMAÇÃO)
 # ================================================
 st.markdown("""
-<style>
 
-.refresh-btn {
-    position: fixed;
-    bottom: 26px;
-    right: 26px;
-    z-index: 9999;
+""", unsafe_allow_html=True)
 
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
-    color: white;
-    border-radius: 50%;
-    width: 68px;
-    height: 68px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    font-size: 32px;
-    cursor: pointer;
-
-    box-shadow: 0 0 25px rgba(168, 85, 247, 0.65);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.refresh-btn:hover {
-    transform: scale(1.15) rotate(190deg);
-    box-shadow: 0 0 40px rgba(168, 85, 247, 0.95);
-}
-
-.refresh-btn:active {
-    transform: scale(0.92);
-}
-</style>
-
-
+# Listener
+if "refresh_now" in st.session_state and st.session_state["refresh_now"]:
+    st.session_state["refresh_now"] = False
+    st.rerun()
 
 
 import pandas as pd
@@ -50,27 +84,6 @@ import requests
 from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
-
-# ============================
-# 🔄 BOTÃO FLUTUANTE REAL
-# ============================
-def reload_dfs_only():
-    try:
-        st.toast("Atualizando...")
-    except:
-        st.write("Atualizando...")
-    # >>> AQUI você coloca sua lógica REAL de recarregar planilha <<<
-    # Exemplo:
-    # carregar_todos_os_dfs()
-    try:
-        st.toast("Atualizado! ✔️")
-    except:
-        st.success("Atualizado! ✔️")
-
-clicked_refresh = st.button("🔄", key="refresh_button")
-if clicked_refresh:
-    reload_dfs_only()
-
 
 
 
@@ -312,6 +325,25 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
     transform:translateY(-2px);
     transition:.2s;
     box-shadow:0 8px 20px rgba(0,0,0,0.35);
+}
+
+
+div.stButton:last-of-type::after {
+    content: "!";
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #ff3333;
+    color: white;
+    border-radius: 50%;
+    font-size: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 0 10px #ff3333;
+    animation: pulse 1.3s infinite;
 }
 
 </style>
@@ -911,7 +943,26 @@ with tabs[2]:
     .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     .muted { color:#cfcfe0; font-size:13px; }
 
-    </style>
+    
+div.stButton:last-of-type::after {
+    content: "!";
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    background: #ff3333;
+    color: white;
+    border-radius: 50%;
+    font-size: 13px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 0 10px #ff3333;
+    animation: pulse 1.3s infinite;
+}
+
+</style>
     """, unsafe_allow_html=True)
 
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
@@ -1036,7 +1087,36 @@ with tabs[2]:
 
     # render grid with selected columns layout
     # inject dynamic grid style
-    st.markdown(f"<style>.card-grid-ecom{{grid-template-columns: repeat({grid_cols},1fr);}}</style>", unsafe_allow_html=True)
+    
+st.markdown(
+    f"""
+    <style>
+    .card-grid-ecom {{
+        grid-template-columns: repeat({grid_cols}, 1fr);
+    }}
+
+    div.stButton:last-of-type::after {{
+        content: "!";
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        width: 18px;
+        height: 18px;
+        background: #ff3333;
+        color: white;
+        border-radius: 50%;
+        font-size: 13px;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        box-shadow:0 0 10px #ff3333;
+        animation: pulse 1.3s infinite;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+, unsafe_allow_html=True)
     st.markdown("<div class='card-grid-ecom'>", unsafe_allow_html=True)
 
     for _, r in df_page.iterrows():
@@ -1114,66 +1194,3 @@ with tabs[2]:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
-
-
-# ============================
-# 
-
-
-# ============================
-# CSS BOTÃO FLUTUANTE (ESCOPO SEGURO)
-# ============================
-st.markdown("""
-<style>
-.refresh-style {
-    position: fixed !important;
-    bottom: 120px !important;
-    right: 30px !important;
-    z-index: 999999 !important;
-    pointer-events: auto !important;
-}
-.refresh-style > button {
-    width: 70px !important;
-    height: 70px !important;
-    border-radius: 50% !important;
-    background: linear-gradient(135deg, rgba(150,90,255,0.25), rgba(80,40,200,0.35)) !important;
-    backdrop-filter: blur(8px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(8px) saturate(180%) !important;
-    border: 2px solid rgba(180,150,255,0.35) !important;
-    font-size: 32px !important;
-    color: white !important;
-    box-shadow: 0 0 25px rgba(150,90,255,0.4), 0 0 10px rgba(150,90,255,0.3);
-    transition: 0.2s ease-in-out;
-}
-.refresh-style > button:hover {
-    transform: translateY(-8px) scale(1.08);
-    box-shadow: 0 0 35px rgba(180,120,255,0.55);
-}
-div[data-testid="stButton"] { position: static !important; }
-</style>
-
-<script>
-function tagRefreshButton(){
-    try{
-        const btns = Array.from(document.querySelectorAll('div[data-testid="stButton"]'));
-        for(const b of btns){
-            const innerBtn = b.querySelector('button');
-            if(innerBtn && innerBtn.innerText && innerBtn.innerText.trim() === '🔄'){
-                b.classList.add('refresh-style');
-                b.style.display = 'flex';
-                return true;
-            }
-        }
-    }catch(e){}
-    return false;
-}
-let attempts = 0;
-const maxAttempts = 10;
-const interval = setInterval(()=>{
-    attempts += 1;
-    const ok = tagRefreshButton();
-    if(ok || attempts >= maxAttempts) clearInterval(interval);
-}, 250);
-</script>
-""", unsafe_allow_html=True)
