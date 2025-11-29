@@ -65,36 +65,6 @@ from io import BytesIO
 
 st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
-# ============================
-# TOPBAR - NOVE STORE
-# ============================
-import streamlit as st
-from PIL import Image
-
-try:
-    logo = Image.open("logo.png")
-except:
-    logo = None
-
-top1, top2, top3 = st.columns([0.08, 0.82, 0.10])
-
-with top1:
-    if logo:
-        st.image(logo, width=40)
-
-with top2:
-    st.markdown(
-        "<h1 style='margin:0; padding:0; display:flex; align-items:center;'>NOVE STORE — Dashboard</h1>",
-        unsafe_allow_html=True
-    )
-
-with top3:
-    refresh_clicked = st.button("🔄", key="refresh_real_button")
-    if refresh_clicked:
-        st.session_state["refresh_now"] = True
-        st.rerun()
-
-
 
 
 # --- Cálculo GLOBAL de Produtos Encalhados (limpo) ---
@@ -1137,57 +1107,3 @@ with tabs[2]:
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
-
-
-# ========== NEW REFRESH BUTTON WITH BADGE ==========
-st.markdown("""
-<style>
-div[data-testid="stButton"] { position: static !important; }
-.refresh-floating{
-    position: relative !important;
-    margin-top: 8px !important;
-    margin-left: -8px !important;
-    z-index: 999999 !important;
-}
-.refresh-floating > button{
-    width:45px!important;
-    height:45px!important;
-    border-radius:50%!important;
-    font-size:24px!important;
-}
-.refresh-badge{
-    position:absolute; top:-4px; right:-4px;
-    width:16px; height:16px;
-    background:#ff3030; color:white;
-    border-radius:50%; font-size:11px;
-    display:flex; align-items:center; justify-content:center;
-    box-shadow:0 0 10px #ff3030;
-    animation:pulse 1.3s infinite;
-}
-@keyframes pulse {0%{transform:scale(1);}50%{transform:scale(1.2);}100%{transform:scale(1);} }
-</style>
-
-<script>
-function setRefresh(){
-    const btns=document.querySelectorAll('div[data-testid="stButton"]');
-    for(const box of btns){
-        const b=box.querySelector("button");
-        if(b && b.innerText.trim()==="🔄"){
-            box.classList.add("refresh-floating");
-            if(!box.querySelector(".refresh-badge")){
-                let bd=document.createElement("div");
-                bd.className="refresh-badge";
-                bd.innerHTML="!";
-                box.style.position="relative";
-                box.appendChild(bd);
-            }
-            return true;
-        }
-    }
-    return false;
-}
-let t=0,lim=20;
-let iv=setInterval(()=>{t++; if(setRefresh()||t>lim) clearInterval(iv);},200);
-</script>
-""", unsafe_allow_html=True)
