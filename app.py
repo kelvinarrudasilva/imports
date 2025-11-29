@@ -80,36 +80,24 @@ st.set_page_config(page_title="Nove Store — Dashboard", page_icon="logo.png", 
 
 st.markdown("""
 <style>
-:root{
-  --turquesa: #19C6C2;
-  --laranja: #C96A18;
-  --preto: #0b0b0b;
-  --cinza: #141414;
-}
 
 .logo-wrap {
     width: 160px !important;
     height: 160px !important;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 24px;
-    background: #0b0b0b;
-    border: 4px solid var(--laranja);
-    box-shadow: 0 0 22px rgba(201,106,24,0.45);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
 }
+
 .logo-wrap img {
     width: 150px !important;
     height: 150px !important;
     object-fit: contain;
 }
-.title { font-size:28px !important; font-weight:900 !important; color:var(--turquesa) !important; }
-.subtitle { font-size:14px !important; color:#bdbdbd !important; }
-.kpi { border-left:6px solid var(--turquesa) !important; }
-.kpi-lucro { border-left-color: var(--laranja) !important; }
-.badge.low { background:rgba(201,106,24,0.25); color:var(--laranja); border:1px solid rgba(201,106,24,0.4); }
-.badge.hot { background:rgba(25,198,194,0.22); color:var(--turquesa); border:1px solid rgba(25,198,194,0.4); }
-.avatar.neon { background: linear-gradient(135deg, var(--turquesa), var(--laranja)); box-shadow:0 0 18px rgba(25,198,194,0.25); }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -259,7 +247,7 @@ st.markdown("""
 body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
 .topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
 
-.logo-wrap svg { width:26px; height:26px; }
+
 .title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
 .subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
 .kpi-row { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
