@@ -10,17 +10,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-.logo-original {
-    width: 200px !important;
-    height: 200px !important;
-    object-fit: contain !important;
-    image-rendering: auto !important;
-}
-.topbar {
-    display:flex !important;
-    justify-content:flex-start !important;
-    align-items:center !important;
-}
+
+
 
 
 
@@ -93,6 +84,48 @@ st.set_page_config(page_title="Nove Store — Dashboard", page_icon="logo.png", 
 
 st.markdown("""
 <style>
+
+.topbar {
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    margin-top: -10px !important;
+    padding-top: 5px !important;
+}
+
+.logo-wrap {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.logo-original {
+    width: 200px !important;
+    height: 200px !important;
+    object-fit: contain !important;
+    image-rendering: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.block-container {
+    padding-top: 0rem !important;
+}
+
+.main > div {
+    padding-top: 0px !important;
+    margin-top: -20px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
 .block-container {
     padding-top: 0rem !important;
 }
@@ -100,10 +133,7 @@ st.markdown("""
     padding-top: 0px !important;
     margin-top: -20px !important;
 }
-.topbar {
-    margin-top: -10px !important;
-    padding-top: 5px !important;
-}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -111,16 +141,7 @@ st.markdown("""
 st.markdown("""
 <style>
 
-.logo-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: auto !important;
-    height: auto !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
+
 
 </style>
 """, unsafe_allow_html=True)
