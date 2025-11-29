@@ -106,7 +106,7 @@ st.markdown("""
     justify-content: center;
     border-radius: 24px;
     background: #0b0b0b;
-    border: 4px solid var(--laranja);
+    border: 1px solid var(--laranja);
     box-shadow: 0 0 22px rgba(201,106,24,0.45);
 }
 .logo-wrap img {
