@@ -3,10 +3,12 @@ import streamlit as st
 
 # ============================================================
 # 
+
 # ============================================================
-# 🔮 BOTÃO FLUTUANTE PREMIUM — LADO ESQUERDO (GLASS + NEON)
+# 🔮 BOTÃO FLUTUANTE PREMIUM — LADO ESQUERDO (GLASS + NEON) via components.html
 # ============================================================
-st.markdown("""
+import streamlit.components.v1 as components as _components  # alias to avoid shadowing earlier import
+_components.html(r"""
 <style>
 /* left floating glass + neon button */
 #refresh-glass-btn{
@@ -85,21 +87,9 @@ st.markdown("""
   const btn = document.getElementById("refresh-glass-btn");
   const toast = document.getElementById("__refresh_toast");
   function showToastOnce(){
-    // only show toast if query param refreshed=1 is set
-    try{
-      const params = new URLSearchParams(window.location.search);
-      if(params.get("refreshed")==="1"){
-        toast.style.display="block";
-        setTimeout(()=>{ toast.style.opacity=1; },20);
-        setTimeout(()=>{ toast.style.opacity=0; setTimeout(()=>{ toast.style.display="none"; },350); },2200);
-        // remove query param without reloading
-        params.delete("refreshed");
-        const newurl = window.location.pathname + (params.toString()? "?" + params.toString() : "");
-        window.history.replaceState({}, document.title, newurl);
-      }
-    }catch(e){ /* ignore */ }
+    // display when receiving a 'show_toast' message
   }
-  // click handler creates ripple, sets query param and reloads
+  // click handler creates ripple, then notifies Streamlit via postMessage that sets a component value
   btn.addEventListener("click", function(ev){
     const inner = document.getElementById("refresh-inner");
     const ripple = document.createElement("div");
@@ -109,25 +99,26 @@ st.markdown("""
     inner.appendChild(ripple);
     setTimeout(()=>{ try{ ripple.remove() }catch(e){} },900);
 
-    // build url with refreshed=1 (preserve other params)
-    try{
-      const url = new URL(window.location.href);
-      url.searchParams.set("refreshed", "1");
-      // navigate to the new url (this reloads the app)
-      window.location.href = url.toString();
-    }catch(e){
-      // fallback to simple reload
-      window.location.reload();
-    }
+    // send message Streamlit listens to (components.html context)
+    window.parent.postMessage({isStreamlitMessage:true, type:"streamlit:setComponentValue", key:"refresh_now", value:true}, "*");
   }, false);
 
-  // run on load to show the toast if needed
-  document.addEventListener("DOMContentLoaded", showToastOnce);
-  // also try immediately in case DOMContentLoaded already fired
-  setTimeout(showToastOnce, 150);
+  // Listen to messages from parent to show toast (parent can send 'show_toast' message)
+  window.addEventListener("message", function(e){
+    try{
+      const d = e.data || {};
+      if(d && d.type === "show_refresh_toast"){
+        toast.style.display="block";
+        toast.style.opacity=1;
+        setTimeout(()=>{ toast.style.opacity=0; setTimeout(()=>{ toast.style.display="none"; },350); },2200);
+      }
+    }catch(err){}
+  }, false);
+
 })();
 </script>
-""", unsafe_allow_html=True)
+""", height=140)
+# ============================================================
 # ============================================================
 
 import pandas as pd
@@ -451,6 +442,53 @@ def carregar_xlsx_from_url(url):
     r.raise_for_status()
     return pd.ExcelFile(BytesIO(r.content))
 
+
+
+# -----------------------------
+# Função para recarregar apenas as abas/DFs (usada pelo botão premium)
+# -----------------------------
+def reload_dfs_only():
+    global dfs, xls, abas_all
+    try:
+        xls_local = carregar_xlsx_from_url(URL_PLANILHA)
+        abas_local = xls_local.sheet_names
+        dfs_local = {}
+        for aba in [\"ESTOQUE\",\"VENDAS\",\"COMPRAS\"]:
+            if aba in abas_local:
+                raw = pd.read_excel(URL_PLANILHA, sheet_name=aba, header=None)
+                cleaned = limpar_aba_raw(raw, aba)
+                if cleaned is not None:
+                    dfs_local[aba] = cleaned
+        # overwrite dfs with loaded tabs (keep other keys if any)
+        for k in list(dfs.keys()):
+            dfs.pop(k, None)
+        for k,v in dfs_local.items():
+            dfs[k] = v
+        # recompute some cached globals used later (safe minimal recompute)
+        try:
+            if \"ESTOQUE\" in dfs:
+                df_e = dfs[\"ESTOQUE\"].copy()
+                # normalizações simples (mantém compatibilidade)
+                df_e[\"EM ESTOQUE\"] = parse_int_series(df_e.get(\"EM ESTOQUE\", df_e.get(\"ESTOQUE\", pd.Series(0)))).fillna(0).astype(int)
+                dfs[\"ESTOQUE\"] = df_e
+        except Exception:
+            pass
+        st.session_state[\"last_reload_ts\"] = str(pd.Timestamp.now())
+    except Exception as e:
+        st.error(f\"Erro ao recarregar planilha: {e}\")
+        return
+
+# If the front-end set this flag via the components message, trigger the reload
+if st.session_state.get(\"refresh_now\", False):
+    # reset flag immediately to avoid loops
+    st.session_state[\"refresh_now\"] = False
+    reload_dfs_only()
+    # inform user
+    try:
+        st.toast(\"Atualizado! ✅\")
+    except Exception:
+        st.success(\"Atualizado! ✅\")
+    # continue execution (no full page reload)
 def detectar_linha_cabecalho(df_raw,keywords):
     for i in range(min(len(df_raw),12)):
         linha=" ".join(df_raw.iloc[i].astype(str).str.upper().tolist())
