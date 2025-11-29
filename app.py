@@ -447,7 +447,32 @@ def preparar_tabela_vendas(df):
         except:
             pass
 
+    
+    # ensure raw values for lucro calculation
+    try:
+        d["VALOR VENDA_RAW"] = parse_money_series(df["VALOR VENDA"]).fillna(0)
+    except:
+        d["VALOR VENDA_RAW"] = pd.to_numeric(df["VALOR VENDA"], errors="coerce").fillna(0)
+
+    try:
+        d["CUSTO_RAW"] = parse_money_series(df["MEDIA CUSTO UNITARIO"]).fillna(0)
+    except:
+        d["CUSTO_RAW"] = pd.to_numeric(df["MEDIA CUSTO UNITARIO"], errors="coerce").fillna(0)
+
+    # calculate lucro total
+    try:
+        d["LUCRO TOTAL"] = (d["VALOR VENDA_RAW"] - d["CUSTO_RAW"]) * d["QTD"]
+    except:
+        d["LUCRO TOTAL"] = 0
+
+    # format lucro total
+    try:
+        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].map(formatar_reais_com_centavos)
+    except:
+        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X','.') )
+
     return d
+
 
 def plotly_dark_config(fig):
     fig.update_layout(
