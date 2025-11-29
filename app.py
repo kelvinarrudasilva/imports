@@ -1,5 +1,61 @@
 # app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 import streamlit as st
+
+# ================================================
+# 🔄 BOTÃO FLUTUANTE PREMIUM (ROXO NEON + ANIMAÇÃO)
+# ================================================
+st.markdown("""
+<style>
+
+.refresh-btn {
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    z-index: 9999;
+
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: white;
+    border-radius: 50%;
+    width: 68px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 32px;
+    cursor: pointer;
+
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.65);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.refresh-btn:hover {
+    transform: scale(1.15) rotate(190deg);
+    box-shadow: 0 0 40px rgba(168, 85, 247, 0.95);
+}
+
+.refresh-btn:active {
+    transform: scale(0.92);
+}
+</style>
+
+<div class="refresh-btn" onclick="triggerRefresh()">
+    🔄
+</div>
+
+<script>
+function triggerRefresh() {
+    window.parent.postMessage({isStreamlitMessage: true, type: "streamlit:setComponentValue", value: "refresh_now"}, "*");
+}
+</script>
+""", unsafe_allow_html=True)
+
+# Listener
+if "refresh_now" in st.session_state and st.session_state["refresh_now"]:
+    st.session_state["refresh_now"] = False
+    st.rerun()
+
+
 import pandas as pd
 import plotly.express as px
 import re
@@ -391,7 +447,32 @@ def preparar_tabela_vendas(df):
         except:
             pass
 
+    
+    # ensure raw values for lucro calculation
+    try:
+        d["VALOR VENDA_RAW"] = parse_money_series(df["VALOR VENDA"]).fillna(0)
+    except:
+        d["VALOR VENDA_RAW"] = pd.to_numeric(df["VALOR VENDA"], errors="coerce").fillna(0)
+
+    try:
+        d["CUSTO_RAW"] = parse_money_series(df["MEDIA CUSTO UNITARIO"]).fillna(0)
+    except:
+        d["CUSTO_RAW"] = pd.to_numeric(df["MEDIA CUSTO UNITARIO"], errors="coerce").fillna(0)
+
+    # calculate lucro total
+    try:
+        d["LUCRO TOTAL"] = (d["VALOR VENDA_RAW"] - d["CUSTO_RAW"]) * d["QTD"]
+    except:
+        d["LUCRO TOTAL"] = 0
+
+    # format lucro total
+    try:
+        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].map(formatar_reais_com_centavos)
+    except:
+        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X','.') )
+
     return d
+
 
 def plotly_dark_config(fig):
     fig.update_layout(
