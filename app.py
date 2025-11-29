@@ -38,6 +38,8 @@ st.markdown("""
     transform: scale(0.92);
 }
 </style>
+""", unsafe_allow_html=True)
+
 
 
 
