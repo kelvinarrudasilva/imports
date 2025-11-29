@@ -78,30 +78,6 @@ from io import BytesIO
 
 st.set_page_config(page_title="Nove Store — Dashboard", page_icon="logo.png", layout="wide", initial_sidebar_state="collapsed")
 
-st.markdown("""
-<style>
-
-.logo-wrap {
-    width: 160px !important;
-    height: 160px !important;
-    border-radius: 22px;
-    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
-}
-
-.logo-wrap img {
-    width: 150px !important;
-    height: 150px !important;
-    object-fit: contain;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-
 
 
 # --- Cálculo GLOBAL de Produtos Encalhados (limpo) ---
@@ -246,8 +222,8 @@ st.markdown("""
 }
 body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
 .topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-
-
+.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+.logo-wrap svg { width:26px; height:26px; }
 .title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
 .subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
 .kpi-row { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
