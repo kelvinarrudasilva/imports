@@ -1,13 +1,17 @@
+# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
+import streamlit as st
 
+st.markdown("""
 <style>
 @keyframes spin {
   0% {transform: rotate(0deg);}
   100% {transform: rotate(360deg);}
 }
+.logo-anim { animation: spin 6s linear infinite; }
 </style>
+""", unsafe_allow_html=True)
 
-# app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
-import streamlit as st
+
 
 from PIL import Image
 import base64
@@ -18,7 +22,7 @@ logo_small = logo.resize((44,44))
 buffer = BytesIO()
 logo_small.save(buffer, format="PNG")
 encoded_logo = base64.b64encode(buffer.getvalue()).decode("utf-8")
-logo_html = f'<img src="data:image/png;base64,{encoded_logo}" style="width:96px;height:96px;animation:spin 6s linear infinite;border-radius:8px;object-fit:contain;">'
+logo_html = f'<img src="data:image/png;base64,{encoded_logo}" style="width:96px;height:96px;" class="logo-anim">'
 
 
 # ================================================
