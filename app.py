@@ -37,21 +37,53 @@ st.set_page_config(page_title="Nove Store — Dashboard", page_icon="logo.png", 
 
 st.markdown("""
 <style>
+
+.topbar {
+    display: grid !important;
+    grid-template-columns: 220px 1fr !important;
+    align-items: center !important;
+    gap: 20px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.logo-wrap {
+    width: 220px !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.logo-original {
+    width: 200px !important;
+    height: 200px !important;
+    object-fit: contain !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
 .block-container {
     padding-top: 0 !important;
-    margin-top: -35px !important;
 }
-header, .main > div:nth-child(1) {
+
+.main {
     padding-top: 0 !important;
-    margin-top: -35px !important;
+    margin-top: -25px !important;
 }
-.topbar {
-    display:flex !important;
-    align-items:center !important;
-    gap:12px !important;
-    margin:0 !important;
-    padding:0 !important;
-}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<style>
+
+header, 
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -523,11 +555,11 @@ with col_kpis:
     st.markdown(f"""
     <div class="kpi-row">
       <div class="kpi"><h3>💵 Total Vendido</h3><div class="value">{formatar_reais_sem_centavos(total_vendido)}</div></div>
-      <div class="kpi" style="border-left-color:#34d399;"><h3>🧾 Total Lucro</h3><div class="value">{formatar_reais_sem_centavos(total_lucro)}</div></div>
-      <div class="kpi" style="border-left-color:#f59e0b;"><h3>💸 Total Compras</h3><div class="value">{formatar_reais_sem_centavos(total_compras)}</div></div>
-      <div class="kpi" style="border-left-color:#8b5cf6;"><h3>📦 Valor Custo Estoque</h3><div class="value">{formatar_reais_sem_centavos(valor_custo_estoque)}</div></div>
-      <div class="kpi" style="border-left-color:#a78bfa;"><h3>🏷️ Valor Venda Estoque</h3><div class="value">{formatar_reais_sem_centavos(valor_venda_estoque)}</div></div>
-      <div class="kpi" style="border-left-color:#6ee7b7;"><h3>🔢 Qtde Total Itens</h3><div class="value">{quantidade_total_itens}</div></div>
+      <div class="kpi" class="logo-original"><h3>🧾 Total Lucro</h3><div class="value">{formatar_reais_sem_centavos(total_lucro)}</div></div>
+      <div class="kpi" class="logo-original"><h3>💸 Total Compras</h3><div class="value">{formatar_reais_sem_centavos(total_compras)}</div></div>
+      <div class="kpi" class="logo-original"><h3>📦 Valor Custo Estoque</h3><div class="value">{formatar_reais_sem_centavos(valor_custo_estoque)}</div></div>
+      <div class="kpi" class="logo-original"><h3>🏷️ Valor Venda Estoque</h3><div class="value">{formatar_reais_sem_centavos(valor_venda_estoque)}</div></div>
+      <div class="kpi" class="logo-original"><h3>🔢 Qtde Total Itens</h3><div class="value">{quantidade_total_itens}</div></div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -906,9 +938,9 @@ with tabs[2]:
         enc_style = ""
         try:
             if nome in _enc_list_global:
-                enc_style="style='border-left:6px solid #ef4444; animation:pulseRed 2s infinite;'"
+                enc_class="logo-original"
             elif nome in _top5_list_global:
-                enc_style="style='border-left:6px solid #22c55e;'"
+                enc_class="logo-original"
         except Exception:
             pass
 
