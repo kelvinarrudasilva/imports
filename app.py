@@ -7,7 +7,8 @@ import streamlit as st
 # ============================================================
 # 🔮 BOTÃO FLUTUANTE PREMIUM — LADO ESQUERDO (GLASS + NEON) via components.html
 # ============================================================
-import streamlit.components.v1 as components as _components  # alias to avoid shadowing earlier import
+import streamlit.components.v1 as components
+_components = components  # alias to avoid shadowing earlier import
 _components.html(r"""
 <style>
 /* left floating glass + neon button */
