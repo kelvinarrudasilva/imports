@@ -325,19 +325,11 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
 # =============================
 # Top Bar
 # =============================
-st.markdown("""
-
+st.markdown(f"""
 <div class="topbar">
   <div class="logo-wrap">
     {logo_html}
   </div>
-  <div>
-    <div class="title">Nove Store — Dashboard</div>
-    <div class="subtitle">Visão rápida de vendas e estoque</div>
-  </div>
-</div>
-
-
   <div>
     <div class="title">Nove Store — Dashboard</div>
     <div class="subtitle">Visão rápida de vendas e estoque</div>
