@@ -1,74 +1,5 @@
 # app.py — Dashboard Loja Importados (Roxo Minimalista) — Dark Theme Mobile
 import streamlit as st
-
-st.markdown("""
-<style>
-
-  100% {transform: rotate(360deg);}
-}
-.logo-anim { animation: spin 6s linear infinite; }
-</style>
-""", unsafe_allow_html=True)
-
-
-
-from PIL import Image
-import base64
-from io import BytesIO
-
-logo = Image.open("logo.png")
-logo_small = logo
-buffer = BytesIO()
-logo_small.save(buffer, format="PNG")
-encoded_logo = base64.b64encode(buffer.getvalue()).decode("utf-8")
-logo_html = f'<img src="data:image/png;base64,{encoded_logo}" class="logo-img" >'
-
-
-# ================================================
-# 🔄 BOTÃO FLUTUANTE PREMIUM (ROXO NEON + ANIMAÇÃO)
-# ================================================
-st.markdown("""
-<style>
-
-.refresh-btn {
-    position: fixed;
-    bottom: 26px;
-    right: 26px;
-    z-index: 9999;
-
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
-    color: white;
-    border-radius: 50%;
-    width: 68px;
-    height: 68px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    font-size: 32px;
-    cursor: pointer;
-
-    box-shadow: 0 0 25px rgba(168, 85, 247, 0.65);
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-
-.refresh-btn:hover {
-    transform: scale(1.15) rotate(190deg);
-    box-shadow: 0 0 40px rgba(168, 85, 247, 0.95);
-}
-
-.refresh-btn:active {
-    transform: scale(0.92);
-}
-</style>
-
-
-""", unsafe_allow_html=True)
-
-# Listener
-
-
-
 import pandas as pd
 import plotly.express as px
 import re
@@ -76,54 +7,7 @@ from datetime import datetime, timedelta
 import requests
 from io import BytesIO
 
-st.set_page_config(page_title="Nove Store — Dashboard", page_icon="logo.png", layout="wide", initial_sidebar_state="collapsed")
-
-st.markdown("""
-<style>
-.logo-img {
-    width: 150px !important;
-    height: 150px !important;
-    object-fit: contain !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-st.markdown("""
-<style>
-:root{
-  --turquesa: #19C6C2;
-  --laranja: #C96A18;
-  --preto: #0b0b0b;
-  --cinza: #141414;
-}
-
-.logo-wrap {
-    width: 160px !important;
-    height: 160px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 24px;
-    background: #0b0b0b;
-    border: 4px solid var(--laranja);
-    box-shadow: 0 0 22px rgba(201,106,24,0.45);
-}
-.logo-wrap img {
-    width: 150px !important;
-    height: 150px !important;
-    object-fit: contain;
-}
-.title { font-size:28px !important; font-weight:900 !important; color:var(--turquesa) !important; }
-.subtitle { font-size:14px !important; color:#bdbdbd !important; }
-.kpi { border-left:6px solid var(--turquesa) !important; }
-.kpi-lucro { border-left-color: var(--laranja) !important; }
-.badge.low { background:rgba(201,106,24,0.25); color:var(--laranja); border:1px solid rgba(201,106,24,0.4); }
-.badge.hot { background:rgba(25,198,194,0.22); color:var(--turquesa); border:1px solid rgba(25,198,194,0.4); }
-.avatar.neon { background: linear-gradient(135deg, var(--turquesa), var(--laranja)); box-shadow:0 0 18px rgba(25,198,194,0.25); }
-</style>
-""", unsafe_allow_html=True)
-
+st.set_page_config(page_title="Loja Importados – Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 
 
@@ -269,7 +153,7 @@ st.markdown("""
 }
 body, .stApp { background: var(--bg) !important; color:#f0f0f0 !important; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
 .topbar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
-
+.logo-wrap { width:44px; height:44px; display:flex; align-items:center; justify-content:center; border-radius:10px; background: linear-gradient(135deg,var(--accent),var(--accent-2)); box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
 .logo-wrap svg { width:26px; height:26px; }
 .title { font-size:20px; font-weight:800; color:var(--accent-2); margin:0; line-height:1; }
 .subtitle { margin:0; font-size:12px; color:var(--muted); margin-top:2px; }
@@ -373,13 +257,17 @@ div[data-testid="stVerticalBlock"] > div > section::-webkit-scrollbar { width:8p
 # =============================
 # Top Bar
 # =============================
-st.markdown(f"""
+st.markdown("""
 <div class="topbar">
   <div class="logo-wrap">
-    {logo_html}
+    <svg viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="4" fill="white" fill-opacity="0.06"/>
+      <path d="M7 9h10l-1 6H8L7 9z" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
+      <path d="M9 6l2-2 2 2" stroke="white" stroke-opacity="0.95" stroke-width="1.2"/>
+    </svg>
   </div>
   <div>
-    <div class="title">Nove Store — Dashboard</div>
+    <div class="title">Loja Importados — Dashboard</div>
     <div class="subtitle">Visão rápida de vendas e estoque</div>
   </div>
 </div>
@@ -503,32 +391,7 @@ def preparar_tabela_vendas(df):
         except:
             pass
 
-    
-    # ensure raw values for lucro calculation
-    try:
-        d["VALOR VENDA_RAW"] = parse_money_series(df["VALOR VENDA"]).fillna(0)
-    except:
-        d["VALOR VENDA_RAW"] = pd.to_numeric(df["VALOR VENDA"], errors="coerce").fillna(0)
-
-    try:
-        d["CUSTO_RAW"] = parse_money_series(df["MEDIA CUSTO UNITARIO"]).fillna(0)
-    except:
-        d["CUSTO_RAW"] = pd.to_numeric(df["MEDIA CUSTO UNITARIO"], errors="coerce").fillna(0)
-
-    # calculate lucro total
-    try:
-        d["LUCRO TOTAL"] = (d["VALOR VENDA_RAW"] - d["CUSTO_RAW"]) * d["QTD"]
-    except:
-        d["LUCRO TOTAL"] = 0
-
-    # format lucro total
-    try:
-        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].map(formatar_reais_com_centavos)
-    except:
-        d["LUCRO TOTAL"] = d["LUCRO TOTAL"].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X','.') )
-
     return d
-
 
 def plotly_dark_config(fig):
     fig.update_layout(
