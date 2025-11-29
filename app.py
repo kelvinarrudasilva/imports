@@ -983,7 +983,7 @@ div.stButton:last-of-type::after {
             grid_cols = st.selectbox("Colunas", [2,3,4], index=1)
         with cols[3]:
             ver_tudo = st.checkbox("Ver tudo (sem paginação)", value=False)
-    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
     # filtros avançados
     filtro_baixo = st.checkbox("⚠️ Baixo estoque (≤3)", value=False)
@@ -1118,7 +1118,5 @@ st.markdown(
 )
 
 st.markdown("<div class='card-grid-ecom'>", unsafe_allow_html=True)
-st.markdown(card_html, unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
